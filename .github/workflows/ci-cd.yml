@@ -3,7 +3,7 @@ name: Build, Push to ECR & Deploy to EC2 (Java)
 on:
   push:
     branches:
-      - develop
+      - main
 
 permissions:
   id-token: write
@@ -16,6 +16,13 @@ env:
   APP_PORT: 8080
   MONGODB_DATABASE: test
   AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+  EC2_INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
+  EC2_PUBLIC_IP: ${{ secrets.EC2_PUBLIC_IP }}
+  EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+  APP_JWT_SECRET: ${{ secrets.APP_JWT_SECRET }}
+  SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+
+
 
 jobs:
   build-and-push:
@@ -37,7 +44,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: ${{ env.AWS_REGION }}
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github_access_role
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github_access_role
 
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
@@ -55,10 +62,7 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build \
-            --build-arg MONGODB_URL=${{ secrets.MONGODB_URL }} \
-            --build-arg SPRING_DATA_MONGODB_DATABASE=${{ env.MONGODB_DATABASE }} \
-            -t ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ steps.set-tag.outputs.image_tag }} .
+          docker build -t ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ steps.set-tag.outputs.image_tag }} .
           
           docker tag \
             ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ steps.set-tag.outputs.image_tag }} \
@@ -76,12 +80,12 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: ${{ env.AWS_REGION }}
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github_access_role
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github_access_role
 
       - name: Get EC2 Public IP
         run: |
           PUBLIC_IP=$(aws ec2 describe-instances \
-            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
+            --instance-ids ${{ env.EC2_INSTANCE_ID }} \
             --query 'Reservations[0].Instances[0].PublicIpAddress' \
             --output text)
           echo "EC2_PUBLIC_IP=$PUBLIC_IP" >> $GITHUB_ENV
@@ -91,7 +95,7 @@ jobs:
         with:
           host: ${{ env.EC2_PUBLIC_IP }}
           username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
+          key: ${{ env.EC2_SSH_KEY }}
           script: |
             set -e
             
@@ -131,11 +135,7 @@ jobs:
                 --name ${{ env.CONTAINER_NAME }} \
                 --network runam-net \
                 -p ${{ env.APP_PORT }}:${{ env.APP_PORT }} \
-                -e AWS_S3_BUCKET='${{ secrets.AWS_S3_BUCKET }}' \
-                -e AWS_REGION='${{ env.AWS_REGION }}' \
-                -e AWS_ACCESS_KEY_ID='${{ secrets.AWS_ACCESS_KEY_ID }}' \
-                -e AWS_SECRET_ACCESS_KEY='${{ secrets.AWS_SECRET_ACCESS_KEY }}' \
-                -e APP_JWT_SECRET='${{ secrets.APP_JWT_SECRET }}' \
+                -e APP_JWT_SECRET='${{ env.APP_JWT_SECRET }}' \
                 -e SENDGRID_API_KEY='${{ secrets.SENDGRID_API_KEY }}' \
                 --restart unless-stopped \
                 $IMAGE
