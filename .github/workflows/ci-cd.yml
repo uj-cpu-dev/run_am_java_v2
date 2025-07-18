@@ -1,0 +1,157 @@
+name: Build, Push to ECR & Deploy to EC2 (Java)
+
+on:
+  push:
+    branches:
+      - develop
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: runam_java
+  CONTAINER_NAME: run-am-java-app
+  APP_PORT: 8080
+  MONGODB_DATABASE: test
+  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.set-tag.outputs.image_tag }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 24
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '24'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github_access_role
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image tag
+        id: set-tag
+        run: |
+          TAG_SHA=$(echo "${{ github.sha }}" | cut -c1-6)
+          echo "image_tag=feature-${{ github.ref_name }}-$TAG_SHA" >> $GITHUB_OUTPUT
+
+      - name: Build with Maven
+        run: |
+          ./mvnw clean package -DskipTests
+          cp target/*.jar target/app.jar
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            --build-arg MONGODB_URL=${{ secrets.MONGODB_URL }} \
+            --build-arg SPRING_DATA_MONGODB_DATABASE=${{ env.MONGODB_DATABASE }} \
+            -t ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ steps.set-tag.outputs.image_tag }} .
+          
+          docker tag \
+            ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ steps.set-tag.outputs.image_tag }} \
+            ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ steps.set-tag.outputs.image_tag }}
+
+      - name: Push to ECR
+        run: |
+          docker push ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ steps.set-tag.outputs.image_tag }}
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github_access_role
+
+      - name: Get EC2 Public IP
+        run: |
+          PUBLIC_IP=$(aws ec2 describe-instances \
+            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
+            --query 'Reservations[0].Instances[0].PublicIpAddress' \
+            --output text)
+          echo "EC2_PUBLIC_IP=$PUBLIC_IP" >> $GITHUB_ENV
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ env.EC2_PUBLIC_IP }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            
+            IMAGE=${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ needs.build-and-push.outputs.image_tag }}
+            
+            # --- AWS CLI & Docker Login Setup ---
+            command -v unzip >/dev/null || sudo apt-get update && sudo apt-get install -y unzip curl
+            
+            command -v aws >/dev/null || {
+                echo "AWS CLI v2 not found, installing..."
+                curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+                unzip awscliv2.zip
+                sudo ./aws/install --bin-dir /usr/local/bin --install-dir /usr/local/aws-cli --update
+                rm -rf awscliv2.zip aws/
+            }
+            
+            mkdir -p ~/.aws
+            cat <<EOF > ~/.aws/config
+            [default]
+            region = ${{ env.AWS_REGION }}
+            output = json
+            EOF
+            
+            aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
+                docker login --username AWS --password-stdin ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+            
+            # --- Container Deployment ---
+            echo "Stopping and removing existing container (if any)..."
+            docker stop ${{ env.CONTAINER_NAME }} || true
+            docker rm ${{ env.CONTAINER_NAME }} || true
+            
+            echo "Pulling new Docker image: $IMAGE"
+            docker pull $IMAGE
+            
+            echo "Running new container on port ${{ env.APP_PORT }}"
+            docker run -d \
+                --name ${{ env.CONTAINER_NAME }} \
+                --network runam-net \
+                -p ${{ env.APP_PORT }}:${{ env.APP_PORT }} \
+                -e AWS_S3_BUCKET='${{ secrets.AWS_S3_BUCKET }}' \
+                -e AWS_REGION='${{ env.AWS_REGION }}' \
+                -e AWS_ACCESS_KEY_ID='${{ secrets.AWS_ACCESS_KEY_ID }}' \
+                -e AWS_SECRET_ACCESS_KEY='${{ secrets.AWS_SECRET_ACCESS_KEY }}' \
+                -e APP_JWT_SECRET='${{ secrets.APP_JWT_SECRET }}' \
+                -e SENDGRID_API_KEY='${{ secrets.SENDGRID_API_KEY }}' \
+                --restart unless-stopped \
+                $IMAGE
+            
+            # --- Enhanced Health Check ---
+            echo "Starting health check for ${{ env.CONTAINER_NAME }}..."
+            for i in {1..20}; do
+                if curl -s -f http://localhost:${{ env.APP_PORT }}/actuator/health | grep -q '"status":"UP"'; then
+                echo "✅ Health check passed!"
+                docker logs ${{ env.CONTAINER_NAME }} --tail 20
+                exit 0
+                fi
+                echo "Attempt $i/20: Health check failed, retrying in 10s..."
+                sleep 10
+            done
+            
+            echo "❌ Health check failed after 20 attempts"
+            docker logs ${{ env.CONTAINER_NAME }}
+            exit 1
