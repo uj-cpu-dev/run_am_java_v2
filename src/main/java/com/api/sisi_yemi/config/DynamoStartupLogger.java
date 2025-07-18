@@ -6,6 +6,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.dynamodb.model.DescribeTableRequest;
 
 @Configuration
 public class DynamoStartupLogger {
@@ -16,7 +17,9 @@ public class DynamoStartupLogger {
     public CommandLineRunner testDynamoConnection(DynamoDbClient dynamoDbClient) {
         return args -> {
             try {
-                dynamoDbClient.listTables();
+                dynamoDbClient.describeTable(DescribeTableRequest.builder()
+                        .tableName("users")
+                        .build());
                 logger.info("✅ Successfully connected to DynamoDB.");
             } catch (Exception e) {
                 logger.error("❌ Failed to connect to DynamoDB", e);
