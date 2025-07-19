@@ -45,20 +45,11 @@ public class DynamoDbHelper<T> {
         return existingOpt;
     }
 
-    public List<T> queryByGsi(String indexName, String attributeName, String value) {
-        AttributeValue attrValue = AttributeValue.builder().s(value).build();
-
-        Expression expression = Expression.builder()
-                .expression("#attr = :val")
-                .expressionNames(Map.of("#attr", attributeName))
-                .expressionValues(Map.of(":val", attrValue))
-                .build();
-
+    public List<T> queryByGsi(String indexName, String partitionKeyName, String partitionKeyValue) {
         return table.index(indexName)
-                .query(r -> r
-                        .queryConditional(QueryConditional.keyEqualTo(Key.builder().partitionValue(value).build()))
-                        .filterExpression(expression)
-                )
+                .query(r -> r.queryConditional(
+                        QueryConditional.keyEqualTo(Key.builder().partitionValue(partitionKeyValue).build())
+                ))
                 .stream()
                 .flatMap(page -> page.items().stream())
                 .toList();
