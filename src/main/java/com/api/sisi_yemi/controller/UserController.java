@@ -65,7 +65,7 @@ public class UserController {
 
         DynamoDbHelper<User> userHelper = dynamoDbHelperFactory.getHelper(USER_TABLE_NAME, User.class);
 
-        User user = userHelper.getById(verificationToken.getId())
+        User user = userHelper.getById(verificationToken.getUserId())
                 .orElseThrow(() -> new ApiException("User not found", HttpStatus.NOT_FOUND, "USER_NOT_FOUND"));
 
         user.setEnabled(true);
