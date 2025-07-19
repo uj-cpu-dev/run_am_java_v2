@@ -26,7 +26,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/users")
-@RequiredArgsConstructor
 public class UserController {
 
     private final UserService userService;
@@ -35,8 +34,21 @@ public class UserController {
     private final JwtTokenProvider jwtTokenProvider;
     private final DynamoDbHelperFactory dynamoDbHelperFactory;
 
-    @Value("${users.table}")
     private final String USER_TABLE_NAME;
+
+    public UserController(UserService userService,
+                          VerificationTokenService verificationTokenService,
+                          AuthenticationHelper authHelper,
+                          JwtTokenProvider jwtTokenProvider,
+                          DynamoDbHelperFactory dynamoDbHelperFactory,
+                          @Value("${users.table}") String USER_TABLE_NAME) {
+        this.userService = userService;
+        this.verificationTokenService = verificationTokenService;
+        this.authHelper = authHelper;
+        this.jwtTokenProvider = jwtTokenProvider;
+        this.dynamoDbHelperFactory = dynamoDbHelperFactory;
+        this.USER_TABLE_NAME = USER_TABLE_NAME;
+    }
 
     @GetMapping("/verify-email")
     public ResponseEntity<AuthResponse> verifyEmail(@RequestParam String token, HttpServletResponse response) {

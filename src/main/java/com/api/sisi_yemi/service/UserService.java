@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.mail.MailException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -19,16 +20,25 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 public class UserService {
 
     private final DynamoDbHelperFactory dynamoDbHelperFactory;
-    private final BCryptPasswordEncoder passwordEncoder;
+    private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
     private final VerificationTokenService verificationTokenService;
-
-    @Value("${users.table}")
     private final String USER_TABLE_NAME;
+
+    public UserService(DynamoDbHelperFactory dynamoDbHelperFactory,
+                       PasswordEncoder passwordEncoder,
+                       EmailService emailService,
+                       VerificationTokenService verificationTokenService,
+                       @Value("${users.table}") String USER_TABLE_NAME) {
+        this.dynamoDbHelperFactory = dynamoDbHelperFactory;
+        this.passwordEncoder = passwordEncoder;
+        this.emailService = emailService;
+        this.verificationTokenService = verificationTokenService;
+        this.USER_TABLE_NAME = USER_TABLE_NAME;
+    }
 
     public void register(UserSignupRequest request) {
         DynamoDbHelper<User> userHelper = dynamoDbHelperFactory.getHelper(USER_TABLE_NAME, User.class);

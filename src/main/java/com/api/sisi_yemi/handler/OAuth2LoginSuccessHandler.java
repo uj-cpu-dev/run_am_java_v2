@@ -21,18 +21,27 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final DynamoDbHelperFactory dynamoDbHelperFactory;
 
-    @Value("${frontend.redirect-uri}")
-    private String redirectUri;
+    private final String redirectUri;
 
-    @Value("${users.table}")
     private final String USER_TABLE_NAME;
+
+    public OAuth2LoginSuccessHandler(
+            JwtTokenProvider jwtTokenProvider,
+            DynamoDbHelperFactory dynamoDbHelperFactory,
+            @Value("${frontend.redirect-uri}") String redirectUri,
+            @Value("${users.table}") String userTableName
+    ) {
+        this.jwtTokenProvider = jwtTokenProvider;
+        this.dynamoDbHelperFactory = dynamoDbHelperFactory;
+        this.redirectUri = redirectUri;
+        this.USER_TABLE_NAME = userTableName;
+    }
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request,
