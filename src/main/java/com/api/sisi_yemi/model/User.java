@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSecondaryPartitionKey;
 
 import java.time.Instant;
 
@@ -27,5 +28,10 @@ public class User {
     @DynamoDbPartitionKey
     public String getId() {
         return id;
+    }
+
+    @DynamoDbSecondaryPartitionKey(indexNames = "email-index")
+    public String getEmail() {
+        return email;
     }
 }
