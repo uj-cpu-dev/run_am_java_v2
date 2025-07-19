@@ -1,4 +1,4 @@
-package com.api.sisi_yemi.util;
+package com.api.sisi_yemi.health;
 
 import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.HealthIndicator;
@@ -18,7 +18,7 @@ public class DynamoDbHealthIndicator implements HealthIndicator {
     @Override
     public Health health() {
         try {
-            // Lightweight operation — no need to touch any table
+            // Lightweight operation — connection test
             dynamoDbClient.describeEndpoints(DescribeEndpointsRequest.builder().build());
 
             return Health.up()
