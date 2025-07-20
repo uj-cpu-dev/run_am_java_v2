@@ -1,10 +1,12 @@
 package com.api.sisi_yemi.repository;
 
 import com.api.sisi_yemi.model.UserAd;
+import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
 
+@Repository
 public interface UserAdDynamoDbRepository {
     void save(UserAd ad);
 

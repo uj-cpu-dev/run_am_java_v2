@@ -22,11 +22,7 @@ import java.util.List;
 public class ProfileService {
 
     private final DynamoDbHelperFactory dynamoDbHelperFactory;
-
     private final UserAdDynamoDbRepository userAdRepository;
-
-    private final UserAdService userAdService;
-
     private final String USER_TABLE_NAME;
 
     public ProfileService(DynamoDbHelperFactory dynamoDbHelperFactory,
@@ -35,7 +31,6 @@ public class ProfileService {
                           @Value("${users.table}") String USER_TABLE_NAME) {
         this.dynamoDbHelperFactory = dynamoDbHelperFactory;
         this.userAdRepository = userAdRepository;
-        this.userAdService = userAdService;
         this.USER_TABLE_NAME = USER_TABLE_NAME;
     }
 
