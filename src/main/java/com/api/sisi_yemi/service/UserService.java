@@ -7,11 +7,9 @@ import com.api.sisi_yemi.exception.ApiException;
 import com.api.sisi_yemi.model.User;
 import com.api.sisi_yemi.util.dynamodb.DynamoDbHelper;
 import com.api.sisi_yemi.util.dynamodb.DynamoDbHelperFactory;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.mail.MailException;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 

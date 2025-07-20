@@ -1,6 +1,5 @@
 package com.api.sisi_yemi.util.dynamodb;
 
-import com.api.sisi_yemi.util.dynamodb.DynamoDbHelper;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 
