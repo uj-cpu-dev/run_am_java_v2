@@ -9,6 +9,8 @@ import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbParti
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSecondaryPartitionKey;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 
 @Data
 @DynamoDbBean
@@ -24,6 +26,27 @@ public class User {
     private String password;
     private Instant joinDate;
     private boolean enabled = false;
+    private double rating;
+    private int itemsSold;
+    private int activeListings;
+    private double responseRate;
+    private String phone;
+    private String location;
+    private String bio;
+
+    // Verification status
+    private boolean emailVerified;
+    private boolean phoneVerified;
+
+    // Social media links (optional)
+    private Map<String, String> socialLinks;
+
+    // Preferences
+    private List<String> favoriteCategories;
+
+    private double reviews;
+    private boolean isQuickResponder;
+    private boolean isTopSeller;
 
     @DynamoDbPartitionKey
     public String getId() {
