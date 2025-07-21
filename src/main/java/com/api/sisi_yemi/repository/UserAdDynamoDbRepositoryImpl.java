@@ -68,7 +68,7 @@ public class UserAdDynamoDbRepositoryImpl implements UserAdDynamoDbRepository {
 
         QueryConditional conditional = QueryConditional
                 .keyEqualTo(Key.builder()
-                        .partitionValue(UserAd.AdStatus.ACTIVE.name()) // ✅ Use enum name string
+                        .partitionValue(UserAd.AdStatus.ACTIVE.name())
                         .build());
 
         QueryEnhancedRequest request = QueryEnhancedRequest.builder()

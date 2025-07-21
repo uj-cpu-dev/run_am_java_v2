@@ -58,11 +58,10 @@ public class UserAd {
     }
 
     // === GSI: status-datePosted-index ===
-    @JsonIgnore
     @DynamoDbSecondaryPartitionKey(indexNames = "status-datePosted-index")
-    @DynamoDbAttribute("status") // ✅ Mapped to the real partition key in GSI
-    public String getStatusForDateIndex() {
-        return status != null ? status.name() : null;
+    @DynamoDbAttribute("status")
+    public AdStatus getStatus() {
+        return status;
     }
 
     @JsonIgnore
