@@ -59,7 +59,7 @@ public class UserAd {
     // GSI: status-datePosted-index
     @JsonIgnore
     @DynamoDbSecondaryPartitionKey(indexNames = "status-datePosted-index")
-    public String getStatusForDateIndex() {
+    public String getStatus() {
         return status != null ? status.name() : null;
     }
 

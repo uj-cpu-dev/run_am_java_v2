@@ -1,6 +1,7 @@
 package com.api.sisi_yemi.repository;
 
 import com.api.sisi_yemi.model.UserAd;
+import com.api.sisi_yemi.util.DynamoDbUtilHelper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
@@ -20,9 +21,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class UserAdDynamoDbRepositoryImpl implements UserAdDynamoDbRepository {
 
-    private final DynamoDbEnhancedClient enhancedClient;
+    private final DynamoDbUtilHelper dynamoDbUtilHelper;
     private DynamoDbTable<UserAd> table() {
-        return enhancedClient.table("user_ads", TableSchema.fromBean(UserAd.class));
+        return dynamoDbUtilHelper.getUserAdsTable().getRawTable();
     }
 
     @Override
