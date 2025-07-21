@@ -65,13 +65,18 @@ public class UserAdDynamoDbRepositoryImpl implements UserAdDynamoDbRepository {
     public List<UserAd> findRecentActiveAds(int limit) {
         DynamoDbIndex<UserAd> index = table().index("status-datePosted-index");
 
-        QueryEnhancedRequest.Builder requestBuilder = QueryEnhancedRequest.builder()
-                .queryConditional(QueryConditional.keyEqualTo(
-                        Key.builder().partitionValue("ACTIVE").build()))
-                .limit(limit)
-                .scanIndexForward(false);
+        QueryConditional conditional = QueryConditional
+                .keyEqualTo(Key.builder()
+                        .partitionValue(UserAd.AdStatus.ACTIVE.name()) // ✅ Use enum name string
+                        .build());
 
-        return index.query(requestBuilder.build())
+        QueryEnhancedRequest request = QueryEnhancedRequest.builder()
+                .queryConditional(conditional)
+                .scanIndexForward(false) // Sort descending by datePosted
+                .limit(limit)
+                .build();
+
+        return index.query(request)
                 .stream()
                 .flatMap(page -> page.items().stream())
                 .collect(Collectors.toList());
