@@ -1,5 +1,6 @@
 package com.api.sisi_yemi.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
@@ -17,8 +18,10 @@ import java.util.List;
 public class UserAd {
 
     private String id;
-
     private String userId;
+    // GSI: userId-status-index (Sort)
+    @Setter
+    @Getter
     private AdStatus status;
     private Instant datePosted;
     private String dedupeKey;
@@ -46,21 +49,18 @@ public class UserAd {
         return userId;
     }
 
-    // GSI: userId-status-index
+    // GSI: userId-status-index (Partition)
+    @JsonIgnore
     @DynamoDbSecondaryPartitionKey(indexNames = "userId-status-index")
     public String getUserIdForStatusIndex() {
-        return userId != null ? userId : null;
-    }
-
-    @DynamoDbSecondarySortKey(indexNames = "userId-status-index")
-    public AdStatus getStatus() {
-        return status;
+        return userId;
     }
 
     // GSI: status-datePosted-index
+    @JsonIgnore
     @DynamoDbSecondaryPartitionKey(indexNames = "status-datePosted-index")
-    public AdStatus getStatusForDateIndex() {
-        return status;
+    public String getStatusForDateIndex() {
+        return status != null ? status.name() : null;
     }
 
     @DynamoDbSecondarySortKey(indexNames = "status-datePosted-index")

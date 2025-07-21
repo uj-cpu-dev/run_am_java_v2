@@ -68,7 +68,7 @@ public class UserAdDynamoDbRepositoryImpl implements UserAdDynamoDbRepository {
         return index.query(r -> r
                         .queryConditional(QueryConditional.keyEqualTo(
                                 Key.builder()
-                                        .partitionValue("ACTIVE")
+                                        .partitionValue(UserAd.AdStatus.ACTIVE.name())
                                         .build()))
                         .scanIndexForward(false)
                         .limit(limit))
