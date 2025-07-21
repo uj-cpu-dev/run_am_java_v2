@@ -19,6 +19,10 @@ public class DynamoDbHelper<T> {
         this.table = enhancedClient.table(tableName, TableSchema.fromBean(clazz));
     }
 
+    public DynamoDbTable<T> getRawTable() {
+        return table;
+    }
+
     public void save(T item) {
         table.putItem(item);
     }
@@ -48,6 +52,16 @@ public class DynamoDbHelper<T> {
                 .query(r -> r.queryConditional(
                         QueryConditional.keyEqualTo(Key.builder().partitionValue(partitionKeyValue).build())
                 ))
+                .stream()
+                .flatMap(page -> page.items().stream())
+                .toList();
+    }
+
+    public List<T> queryByCompositeGsi(String indexName, String userId, String adId) {
+        return table.index(indexName)
+                .query(r -> r.queryConditional(QueryConditional.keyEqualTo(
+                        Key.builder().partitionValue(userId).sortValue(adId).build()
+                )))
                 .stream()
                 .flatMap(page -> page.items().stream())
                 .toList();

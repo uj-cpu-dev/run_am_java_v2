@@ -1,20 +1,27 @@
 package com.api.sisi_yemi.controller;
 
 import com.api.sisi_yemi.dto.AdDetailsResponse;
+import com.api.sisi_yemi.dto.FilteredAdResponse;
 import com.api.sisi_yemi.dto.RecentActiveAdResponse;
 import com.api.sisi_yemi.dto.UserAdResponse;
 import com.api.sisi_yemi.exception.ApiException;
 import com.api.sisi_yemi.model.UserAd;
 import com.api.sisi_yemi.service.AdDetailsService;
+import com.api.sisi_yemi.service.FavoriteService;
 import com.api.sisi_yemi.service.UserAdService;
 import com.api.sisi_yemi.util.auth.AuthenticationHelper;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -30,6 +37,8 @@ public class UserAdController {
     private final AuthenticationHelper authHelper;
 
     private final AdDetailsService adDetailsService;
+
+    private final FavoriteService favoriteService;
 
     @GetMapping("/user/userAds")
     public ResponseEntity<?> getAllUserAds() {
@@ -137,5 +146,68 @@ public class UserAdController {
     @GetMapping("/{adId}/userAd")
     public ResponseEntity<AdDetailsResponse> getUserAdById(@PathVariable String adId) {
         return ResponseEntity.ok(adDetailsService.getAdDetails(adId));
+    }
+
+    @GetMapping("/favorites")
+    public ResponseEntity<?> getUserFavorites() {
+        try {
+            String userId = authHelper.getAuthenticatedUserId();
+            List<RecentActiveAdResponse> favorites = favoriteService.getUserFavorites(userId);
+            return ResponseEntity.ok(favorites);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to retrieve favorites: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/{adId}/toggle-favorites")
+    public ResponseEntity<?> toggleFavorite(
+            @PathVariable String adId) {
+
+        try {
+            String userId = authHelper.getAuthenticatedUserId();
+            RecentActiveAdResponse response = favoriteService.toggleFavorite(userId, adId);
+
+            String message = (response.getFavoritedAt() != null)
+                    ? "Ad successfully added to your favorites"
+                    : "Ad removed from your favorites";
+
+            return ResponseEntity.ok(
+                    Map.of(
+                            "message", message
+                    )
+            );
+        } catch (ApiException ex) {
+            return ResponseEntity.status(ex.getStatus()).body(
+                    Map.of(
+                            "error", ex.getMessage(),
+                            "code", ex.getErrorCode()
+                    )
+            );
+        } catch (Exception ex) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                    Map.of(
+                            "error", "An unexpected error occurred",
+                            "details", ex.getMessage()
+                    )
+            );
+        }
+    }
+
+    @GetMapping("/filter")
+    public ResponseEntity<List<FilteredAdResponse>> filterAds(
+            @RequestParam(defaultValue = "ACTIVE") String status,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String location,
+            @RequestParam(required = false) String condition,
+            @RequestParam(required = false) Double minPrice,
+            @RequestParam(required = false) Double maxPrice,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "datePosted") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir,
+            @RequestParam(required = false) Map<String, String> paginationToken
+    ) {
+        List<FilteredAdResponse> ads = Collections.singletonList(userAdService.filterAds(status, category, location, condition, minPrice, maxPrice, search, sortBy, sortDir, paginationToken));
+        return ResponseEntity.ok(ads);
     }
 }

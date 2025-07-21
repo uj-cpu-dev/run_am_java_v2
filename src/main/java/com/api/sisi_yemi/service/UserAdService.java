@@ -1,20 +1,29 @@
 package com.api.sisi_yemi.service;
 
+import com.api.sisi_yemi.dto.FilteredAdResponse;
 import com.api.sisi_yemi.dto.RecentActiveAdResponse;
 import com.api.sisi_yemi.exception.ApiException;
 import com.api.sisi_yemi.model.UserAd;
 import com.api.sisi_yemi.repository.UserAdDynamoDbRepository;
 import com.api.sisi_yemi.util.AdValidator;
+import com.api.sisi_yemi.util.DynamoDbUtilHelper;
 import com.api.sisi_yemi.util.ImageUploader;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import software.amazon.awssdk.core.pagination.sync.SdkIterable;
+import software.amazon.awssdk.enhanced.dynamodb.DynamoDbIndex;
+import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
+import software.amazon.awssdk.enhanced.dynamodb.Key;
+import software.amazon.awssdk.enhanced.dynamodb.model.Page;
+import software.amazon.awssdk.enhanced.dynamodb.model.PageIterable;
+import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
+import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 import java.time.Instant;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -25,6 +34,7 @@ public class UserAdService {
     private final UserAdDynamoDbRepository userAdRepository;
     private final AdValidator adValidator;
     private final ImageUploader imageUploader;
+    private final DynamoDbUtilHelper dynamoDbUtilHelper;
 
     public List<UserAd> getUserAdsByStatus(String userId, UserAd.AdStatus status) {
         return userAdRepository.findByUserIdAndStatus(userId, status);
@@ -165,5 +175,91 @@ public class UserAdService {
                 .status(ad.getStatus())
                 .dateSold(ad.getDateSold())
                 .build();
+    }
+
+    public FilteredAdResponse filterAds(
+            String statusStr,
+            String category,
+            String location,
+            String condition,
+            Double minPrice,
+            Double maxPrice,
+            String search,
+            String sortBy,
+            String sortDir,
+            Map<String, String> paginationToken
+    ) {
+        UserAd.AdStatus status;
+        try {
+            status = UserAd.AdStatus.valueOf(statusStr.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid status: " + statusStr);
+        }
+
+        DynamoDbTable<UserAd> table = dynamoDbUtilHelper.getUserAdsTable().getRawTable();
+        DynamoDbIndex<UserAd> index = table.index("status-datePosted-index");
+
+        QueryEnhancedRequest.Builder queryBuilder = QueryEnhancedRequest.builder()
+                .queryConditional(QueryConditional.keyEqualTo(Key.builder().partitionValue(status.ordinal()).build()))
+                .scanIndexForward("asc".equalsIgnoreCase(sortDir))
+                .limit(20); // Set your desired page size here
+
+        // Handle pagination token
+        if (paginationToken != null && !paginationToken.isEmpty()) {
+            Map<String, AttributeValue> startKey = paginationToken.entrySet().stream()
+                    .collect(Collectors.toMap(
+                            Map.Entry::getKey,
+                            e -> AttributeValue.fromS(e.getValue())
+                    ));
+            queryBuilder.exclusiveStartKey(startKey);
+        }
+
+        // Run the query
+        SdkIterable<Page<UserAd>> sdkPages = index.query(queryBuilder.build());
+        Iterator<Page<UserAd>> iterator = sdkPages.iterator();
+
+        List<UserAd> result = new ArrayList<>();
+        Map<String, AttributeValue> lastEvaluatedKey = null;
+
+        if (iterator.hasNext()) {
+            Page<UserAd> page = iterator.next();
+            page.items().stream()
+                    .filter(ad ->
+                            (category == null || category.equalsIgnoreCase(ad.getCategory())) &&
+                                    (location == null || location.equalsIgnoreCase(ad.getLocation())) &&
+                                    (condition == null || condition.equalsIgnoreCase(ad.getCondition())) &&
+                                    (minPrice == null || ad.getPrice() >= minPrice) &&
+                                    (maxPrice == null || ad.getPrice() <= maxPrice) &&
+                                    (search == null || ad.getTitle().toLowerCase().contains(search.toLowerCase()))
+                    )
+                    .forEach(result::add);
+
+            lastEvaluatedKey = page.lastEvaluatedKey();
+        }
+
+        // Sorting (in-memory)
+        Comparator<UserAd> comparator = switch (sortBy) {
+            case "price" -> Comparator.comparing(UserAd::getPrice);
+            case "datePosted" -> Comparator.comparing(UserAd::getDatePosted);
+            default -> Comparator.comparing(UserAd::getDatePosted);
+        };
+
+        if ("desc".equalsIgnoreCase(sortDir)) {
+            comparator = comparator.reversed();
+        }
+
+        result.sort(comparator);
+
+        // Convert lastEvaluatedKey to string map
+        Map<String, String> nextToken = null;
+        if (lastEvaluatedKey != null && !lastEvaluatedKey.isEmpty()) {
+            nextToken = lastEvaluatedKey.entrySet().stream()
+                    .collect(Collectors.toMap(
+                            Map.Entry::getKey,
+                            e -> e.getValue().s() // Assuming all keys are strings
+                    ));
+        }
+
+        return new FilteredAdResponse(result, nextToken, nextToken != null);
     }
 }

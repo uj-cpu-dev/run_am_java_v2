@@ -15,4 +15,5 @@ public class DynamoDbHelperFactory {
     public <T> DynamoDbHelper<T> getHelper(String tableName, Class<T> clazz) {
         return new DynamoDbHelper<>(dynamoDbClient, tableName, clazz);
     }
+
 }

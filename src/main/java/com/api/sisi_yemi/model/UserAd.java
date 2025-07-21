@@ -15,28 +15,14 @@ import java.util.List;
 @AllArgsConstructor
 @DynamoDbBean
 public class UserAd {
-    @Getter(onMethod_ = @DynamoDbPartitionKey)
+
     private String id;
 
-    @Getter(onMethod_ = @DynamoDbSecondaryPartitionKey(indexNames = "userId-index"))
     private String userId;
-
-    @Getter(onMethod_ = @DynamoDbSecondaryPartitionKey(indexNames = "userId-status-index"))
-    private String userIdForStatusIndex;
-
-    @Getter(onMethod_ = @DynamoDbSecondarySortKey(indexNames = "userId-status-index"))
     private AdStatus status;
-
-    @Getter(onMethod_ = @DynamoDbSecondaryPartitionKey(indexNames = "status-datePosted-index"))
-    private AdStatus statusForDateIndex;
-
-    @Getter(onMethod_ = @DynamoDbSecondarySortKey(indexNames = "status-datePosted-index"))
     private Instant datePosted;
-
-    @Getter(onMethod_ = @DynamoDbSecondaryPartitionKey(indexNames = "dedupe-index"))
     private String dedupeKey;
 
-    // Regular attributes
     private String title;
     private double price;
     private List<ImageData> images;
@@ -47,6 +33,52 @@ public class UserAd {
     private String location;
     private String condition;
     private String description;
+
+    // Partition Key
+    @DynamoDbPartitionKey
+    public String getId() {
+        return id;
+    }
+
+    // GSI: userId-index
+    @DynamoDbSecondaryPartitionKey(indexNames = "userId-index")
+    public String getUserId() {
+        return userId;
+    }
+
+    // GSI: userId-status-index
+    @DynamoDbSecondaryPartitionKey(indexNames = "userId-status-index")
+    public String getUserIdForStatusIndex() {
+        return userId != null ? userId : null;
+    }
+
+    @DynamoDbSecondarySortKey(indexNames = "userId-status-index")
+    public AdStatus getStatus() {
+        return status;
+    }
+
+    // GSI: status-datePosted-index
+    @DynamoDbSecondaryPartitionKey(indexNames = "status-datePosted-index")
+    public AdStatus getStatusForDateIndex() {
+        return status;
+    }
+
+    @DynamoDbSecondarySortKey(indexNames = "status-datePosted-index")
+    public Instant getDatePosted() {
+        return datePosted;
+    }
+
+    // GSI: dedupe-index
+    @DynamoDbSecondaryPartitionKey(indexNames = "dedupe-index")
+    public String getDedupeKey() {
+        return dedupeKey;
+    }
+
+    public void computeDedupeKey() {
+        if (userId != null && title != null && category != null && status != null) {
+            this.dedupeKey = userId + "#" + title + "#" + price + "#" + category + "#" + status.name();
+        }
+    }
 
     @Data
     @Builder
@@ -61,11 +93,5 @@ public class UserAd {
 
     public enum AdStatus {
         ACTIVE, SOLD, DRAFT
-    }
-
-    public void computeDedupeKey() {
-        if (userId != null && title != null && category != null && status != null) {
-            this.dedupeKey = userId + "#" + title + "#" + price + "#" + category + "#" + status.name();
-        }
     }
 }

@@ -1,8 +1,6 @@
 package com.api.sisi_yemi.util;
 
-import com.api.sisi_yemi.model.Conversation;
-import com.api.sisi_yemi.model.Message;
-import com.api.sisi_yemi.model.User;
+import com.api.sisi_yemi.model.*;
 import com.api.sisi_yemi.util.dynamodb.DynamoDbHelper;
 import com.api.sisi_yemi.util.dynamodb.DynamoDbHelperFactory;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +22,14 @@ public class DynamoDbUtilHelper {
 
     public DynamoDbHelper<User> getUserTable() {
         return factory.getHelper("users", User.class);
+    }
+
+    public DynamoDbHelper<Favorite> getFavoriteTable() {
+        return factory.getHelper("favorites", Favorite.class);
+    }
+
+    public DynamoDbHelper<UserAd> getUserAdsTable() {
+        return factory.getHelper("user_ads", UserAd.class);
     }
 }
 
