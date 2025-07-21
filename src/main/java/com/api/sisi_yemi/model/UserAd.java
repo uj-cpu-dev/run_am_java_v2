@@ -2,10 +2,7 @@ package com.api.sisi_yemi.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSecondaryPartitionKey;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSecondarySortKey;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
 
 import java.time.Instant;
 import java.util.List;
@@ -19,9 +16,6 @@ public class UserAd {
 
     private String id;
     private String userId;
-    // GSI: userId-status-index (Sort)
-    @Setter
-    @Getter
     private AdStatus status;
     private Instant datePosted;
     private String dedupeKey;
@@ -37,38 +31,48 @@ public class UserAd {
     private String condition;
     private String description;
 
-    // Partition Key
+    // === PRIMARY KEY ===
     @DynamoDbPartitionKey
     public String getId() {
         return id;
     }
 
-    // GSI: userId-index
+    // === GSI: userId-index ===
     @DynamoDbSecondaryPartitionKey(indexNames = "userId-index")
     public String getUserId() {
         return userId;
     }
 
-    // GSI: userId-status-index (Partition)
+    // === GSI: userId-status-index ===
     @JsonIgnore
     @DynamoDbSecondaryPartitionKey(indexNames = "userId-status-index")
     public String getUserIdForStatusIndex() {
         return userId;
     }
 
-    // GSI: status-datePosted-index
     @JsonIgnore
-    @DynamoDbSecondaryPartitionKey(indexNames = "status-datePosted-index")
-    public String getStatus() {
+    @DynamoDbSecondarySortKey(indexNames = "userId-status-index")
+    @DynamoDbAttribute("status") // Required so DynamoDB Enhanced maps to correct attribute
+    public String getStatusForUserIndex() {
         return status != null ? status.name() : null;
     }
 
+    // === GSI: status-datePosted-index ===
+    @JsonIgnore
+    @DynamoDbSecondaryPartitionKey(indexNames = "status-datePosted-index")
+    @DynamoDbAttribute("status") // ✅ Mapped to the real partition key in GSI
+    public String getStatusForDateIndex() {
+        return status != null ? status.name() : null;
+    }
+
+    @JsonIgnore
     @DynamoDbSecondarySortKey(indexNames = "status-datePosted-index")
     public Instant getDatePosted() {
         return datePosted;
     }
 
-    // GSI: dedupe-index
+    // === GSI: dedupe-index ===
+    @JsonIgnore
     @DynamoDbSecondaryPartitionKey(indexNames = "dedupe-index")
     public String getDedupeKey() {
         return dedupeKey;
@@ -80,6 +84,7 @@ public class UserAd {
         }
     }
 
+    // === Nested Class ===
     @Data
     @Builder
     @NoArgsConstructor
