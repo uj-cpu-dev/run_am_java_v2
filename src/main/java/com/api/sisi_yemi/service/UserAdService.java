@@ -5,6 +5,7 @@ import com.api.sisi_yemi.dto.RecentActiveAdResponse;
 import com.api.sisi_yemi.exception.ApiException;
 import com.api.sisi_yemi.model.UserAd;
 import com.api.sisi_yemi.repository.UserAdDynamoDbRepository;
+import com.api.sisi_yemi.repository.UserAdDynamoDbRepositoryImpl;
 import com.api.sisi_yemi.util.AdValidator;
 import com.api.sisi_yemi.util.DynamoDbUtilHelper;
 import com.api.sisi_yemi.util.ImageUploader;
@@ -31,7 +32,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class UserAdService {
 
-    private final UserAdDynamoDbRepository userAdRepository;
+    private final UserAdDynamoDbRepositoryImpl userAdRepository;
     private final AdValidator adValidator;
     private final ImageUploader imageUploader;
     private final DynamoDbUtilHelper dynamoDbUtilHelper;
