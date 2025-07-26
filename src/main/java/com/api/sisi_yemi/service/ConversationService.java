@@ -8,6 +8,7 @@ import com.api.sisi_yemi.model.Conversation;
 import com.api.sisi_yemi.model.User;
 import com.api.sisi_yemi.model.UserAd;
 import com.api.sisi_yemi.repository.ConversationDynamoDbRepository;
+import com.api.sisi_yemi.repository.ConversationDynamoDbRepositoryImpl;
 import com.api.sisi_yemi.repository.UserAdDynamoDbRepository;
 import com.api.sisi_yemi.util.DynamoDbUtilHelper;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +28,7 @@ import static org.springframework.http.HttpStatus.NOT_FOUND;
 @Slf4j
 public class ConversationService {
 
-    private final ConversationDynamoDbRepository conversationRepository;
+    private final ConversationDynamoDbRepositoryImpl conversationRepository;
     private final DynamoDbUtilHelper dynamoDb;
     private final UserAdDynamoDbRepository userAdRepository;
 

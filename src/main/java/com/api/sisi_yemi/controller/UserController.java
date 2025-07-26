@@ -12,7 +12,6 @@ import com.api.sisi_yemi.util.dynamodb.DynamoDbHelperFactory;
 import com.api.sisi_yemi.util.token.JwtTokenProvider;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
