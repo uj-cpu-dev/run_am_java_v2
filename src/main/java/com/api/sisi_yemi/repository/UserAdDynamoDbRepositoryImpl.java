@@ -97,7 +97,7 @@ public class UserAdDynamoDbRepositoryImpl implements UserAdDynamoDbRepository {
     public boolean existsDuplicate(String userId, String title, double price,
                                    String category, UserAd.AdStatus status) {
         String dedupeKey = userId + "#" + title + "#" + price + "#" + category + "#" + status.name();
-        DynamoDbIndex<UserAd> index = table().index("dedupe-index");
+        DynamoDbIndex<UserAd> index = table().index("dedupeKey-index");
 
         return index.query(r -> r.queryConditional(
                         QueryConditional.keyEqualTo(
@@ -113,7 +113,7 @@ public class UserAdDynamoDbRepositoryImpl implements UserAdDynamoDbRepository {
                                            String category, UserAd.AdStatus status,
                                            String excludedId) {
         String dedupeKey = userId + "#" + title + "#" + price + "#" + category + "#" + status.name();
-        DynamoDbIndex<UserAd> index = table().index("dedupe-index");
+        DynamoDbIndex<UserAd> index = table().index("dedupeKey-index");
 
         return index.query(r -> r.queryConditional(
                         QueryConditional.keyEqualTo(

@@ -72,7 +72,7 @@ public class UserAd {
 
     // === GSI: dedupe-index ===
     @JsonIgnore
-    @DynamoDbSecondaryPartitionKey(indexNames = "dedupe-index")
+    @DynamoDbSecondaryPartitionKey(indexNames = "dedupeKey-index")
     public String getDedupeKey() {
         return dedupeKey;
     }
