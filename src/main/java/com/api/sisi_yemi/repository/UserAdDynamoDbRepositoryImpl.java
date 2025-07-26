@@ -3,7 +3,6 @@ package com.api.sisi_yemi.repository;
 import com.api.sisi_yemi.model.UserAd;
 import com.api.sisi_yemi.util.DynamoDbUtilHelper;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Repository;
 import software.amazon.awssdk.enhanced.dynamodb.*;
@@ -41,7 +40,7 @@ public class UserAdDynamoDbRepositoryImpl implements UserAdDynamoDbRepository {
     @Override
     @Cacheable("userAds")
     public List<UserAd> findByUserId(String userId) {
-        return queryByIndex("userId-index", userId, null);
+        return queryByIndex("userId-index", userId);
     }
 
     @Override
@@ -148,7 +147,7 @@ public class UserAdDynamoDbRepositoryImpl implements UserAdDynamoDbRepository {
                 .collect(Collectors.toList());
     }
 
-    private List<UserAd> queryByIndex(String indexName, String partitionValue, String sortKeyValue) {
+    private List<UserAd> queryByIndex(String indexName, String partitionValue) {
         DynamoDbIndex<UserAd> index = table().index(indexName);
 
         QueryConditional condition = QueryConditional.keyEqualTo(

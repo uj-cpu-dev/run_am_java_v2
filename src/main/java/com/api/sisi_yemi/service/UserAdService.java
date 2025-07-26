@@ -75,7 +75,7 @@ public class UserAdService {
             throw new IllegalArgumentException("Duplicate ad detected");
         }
 
-        userAd.setId(UUID.randomUUID().toString());
+        userAd.setId(userAd.getId());
         userAd.setViews(0);
         userAd.setMessages(0);
         userAd.setDatePosted(Instant.now());

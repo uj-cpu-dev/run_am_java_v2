@@ -29,4 +29,5 @@ public interface UserAdDynamoDbRepository {
     List<UserAd> findByStatus(String status, int limit, String lastEvaluatedId);
 
     void deleteById(String id);
+
 }
