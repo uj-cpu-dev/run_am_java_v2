@@ -1,6 +1,7 @@
 package com.api.sisi_yemi.util;
 
 import com.api.sisi_yemi.model.UserAd;
+import lombok.extern.slf4j.Slf4j;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
@@ -12,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@Slf4j
 public class FilterAdHelper {
 
     public static UserAd.AdStatus parseStatus(String statusStr) {
@@ -25,23 +27,23 @@ public class FilterAdHelper {
     public static QueryEnhancedRequest buildQueryRequest(UserAd.AdStatus status, String sortDir, Map<String, String> paginationToken) {
         QueryEnhancedRequest.Builder builder = QueryEnhancedRequest.builder()
                 .queryConditional(QueryConditional.keyEqualTo(
-                        Key.builder().partitionValue(status.name()).build())) // Use name() instead of ordinal()
+                        Key.builder().partitionValue(status.name()).build()))
                 .scanIndexForward("asc".equalsIgnoreCase(sortDir))
                 .limit(20);
 
         if (paginationToken != null && !paginationToken.isEmpty()) {
             Map<String, AttributeValue> startKey = new HashMap<>();
 
-            if (paginationToken.containsKey("status")) {
-                // Store as string to match GSI definition
-                startKey.put("status", AttributeValue.fromS(paginationToken.get("status")));
-            }
+            String statusValue = paginationToken.get("status");
+            String datePostedValue = paginationToken.get("datePosted");
 
-            if (paginationToken.containsKey("datePosted")) {
-                startKey.put("datePosted", AttributeValue.fromS(paginationToken.get("datePosted")));
+            if (statusValue != null && datePostedValue != null) {
+                startKey.put("status", AttributeValue.fromS(statusValue));
+                startKey.put("datePosted", AttributeValue.fromS(datePostedValue));
+                builder.exclusiveStartKey(startKey);
+            } else {
+                log.warn("Incomplete pagination token. Both 'status' and 'datePosted' are required.");
             }
-
-            builder.exclusiveStartKey(startKey);
         }
 
         return builder.build();
