@@ -83,12 +83,16 @@ public class FilterAdHelper {
     ) {
         return items.stream()
                 .filter(ad ->
-                        (category == null || category.equalsIgnoreCase(ad.getCategory())) &&
-                                (location == null || location.equalsIgnoreCase(ad.getLocation())) &&
-                                (condition == null || condition.equalsIgnoreCase(ad.getCondition())) &&
+                        (category == null || ad.getCategory() != null &&
+                                ad.getCategory().toLowerCase().contains(category.trim().toLowerCase())) &&
+                                (location == null || ad.getLocation() != null &&
+                                        ad.getLocation().equalsIgnoreCase(location.trim())) &&
+                                (condition == null || ad.getCondition() != null &&
+                                        ad.getCondition().equalsIgnoreCase(condition.trim())) &&
                                 (minPrice == null || ad.getPrice() >= minPrice) &&
                                 (maxPrice == null || ad.getPrice() <= maxPrice) &&
-                                (search == null || ad.getTitle().toLowerCase().contains(search.toLowerCase()))
+                                (search == null || ad.getTitle() != null &&
+                                        ad.getTitle().toLowerCase().contains(search.toLowerCase()))
                 )
                 .collect(Collectors.toList());
     }
