@@ -29,36 +29,35 @@ public class FilterAdHelper {
         String datePostedValue = paginationToken != null ? paginationToken.get("datePosted") : null;
 
         Key.Builder keyBuilder = Key.builder().partitionValue(statusValue);
-
         QueryEnhancedRequest.Builder builder = QueryEnhancedRequest.builder()
                 .scanIndexForward("asc".equalsIgnoreCase(sortDir))
                 .limit(20);
 
         log.info("Building QueryConditional for status={}, datePosted={}, sortDir={}", statusValue, datePostedValue, sortDir);
 
-        // Important: only use sort-based condition if sort key is present
         if (datePostedValue != null) {
             keyBuilder.sortValue(datePostedValue);
-            builder.queryConditional(QueryConditional.sortGreaterThanOrEqualTo(keyBuilder.build()));
             log.info("Using QueryConditional.sortGreaterThanOrEqualTo with key: {}", keyBuilder.build());
+            builder.queryConditional(QueryConditional.sortGreaterThanOrEqualTo(keyBuilder.build()));
         } else {
-            builder.queryConditional(QueryConditional.keyEqualTo(keyBuilder.build()));
             log.info("Using QueryConditional.keyEqualTo with key: {}", keyBuilder.build());
+            builder.queryConditional(QueryConditional.keyEqualTo(keyBuilder.build()));
         }
 
-        // Set exclusiveStartKey if full paginationToken is present
-        if (paginationToken != null &&
-                paginationToken.containsKey("status") &&
-                paginationToken.containsKey("datePosted")) {
+        // Sanitize and apply exclusiveStartKey
+        if (paginationToken != null) {
+            String exclusiveStatus = paginationToken.get("status");
+            String exclusiveDate = paginationToken.get("datePosted");
 
-            Map<String, AttributeValue> startKey = new HashMap<>();
-            startKey.put("status", AttributeValue.fromS(paginationToken.get("status")));
-            startKey.put("datePosted", AttributeValue.fromS(paginationToken.get("datePosted")));
-
-            builder.exclusiveStartKey(startKey);
-            log.info("Setting exclusiveStartKey: {}", startKey);
-        } else {
-            log.info("No valid exclusiveStartKey found in token: {}", paginationToken);
+            if (exclusiveStatus != null && exclusiveDate != null) {
+                Map<String, AttributeValue> startKey = new HashMap<>();
+                startKey.put("status", AttributeValue.fromS(exclusiveStatus));
+                startKey.put("datePosted", AttributeValue.fromS(exclusiveDate));
+                log.info("Using exclusiveStartKey: {}", startKey);
+                builder.exclusiveStartKey(startKey);
+            } else {
+                log.info("No valid exclusiveStartKey found in token: {}", paginationToken);
+            }
         }
 
         return builder.build();
@@ -74,14 +73,46 @@ public class FilterAdHelper {
             String search
     ) {
         return items.stream()
-                .filter(ad ->
-                        (category == null || category.equalsIgnoreCase(ad.getCategory())) &&
-                                (location == null || location.equalsIgnoreCase(ad.getLocation())) &&
-                                (condition == null || condition.equalsIgnoreCase(ad.getCondition())) &&
-                                (minPrice == null || ad.getPrice() >= minPrice) &&
-                                (maxPrice == null || ad.getPrice() <= maxPrice) &&
-                                (search == null || ad.getTitle().toLowerCase().contains(search.toLowerCase()))
-                )
+                .filter(ad -> {
+                    // Debug logging for each filter
+                    log.debug("Checking ad: {}", ad.getId());
+
+                    // Category filter (case-insensitive and trimmed)
+                    if (category != null && !category.trim().equalsIgnoreCase(ad.getCategory())) {
+                        log.debug("Category filter failed: {} != {}", category.trim(), ad.getCategory());
+                        return false;
+                    }
+
+                    // Location filter
+                    if (location != null && !location.trim().equalsIgnoreCase(ad.getLocation())) {
+                        log.debug("Location filter failed");
+                        return false;
+                    }
+
+                    // Condition filter
+                    if (condition != null && !condition.trim().equalsIgnoreCase(ad.getCondition())) {
+                        log.debug("Condition filter failed");
+                        return false;
+                    }
+
+                    // Price filters
+                    if (minPrice != null && ad.getPrice() < minPrice) {
+                        log.debug("MinPrice filter failed");
+                        return false;
+                    }
+                    if (maxPrice != null && ad.getPrice() > maxPrice) {
+                        log.debug("MaxPrice filter failed");
+                        return false;
+                    }
+
+                    // Search filter
+                    if (search != null && !ad.getTitle().toLowerCase().contains(search.toLowerCase().trim())) {
+                        log.debug("Search filter failed");
+                        return false;
+                    }
+
+                    return true;
+                })
                 .collect(Collectors.toList());
     }
 
