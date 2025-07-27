@@ -7,6 +7,9 @@ import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -30,21 +33,27 @@ public class FilterAdHelper {
 
         Key.Builder keyBuilder = Key.builder().partitionValue(statusValue);
         QueryEnhancedRequest.Builder builder = QueryEnhancedRequest.builder()
-                .scanIndexForward("asc".equalsIgnoreCase(sortDir))
+                .scanIndexForward("asc".equalsIgnoreCase(sortDir))  // Important: for DynamoDB sort order
                 .limit(20);
 
         log.info("Building QueryConditional for status={}, datePosted={}, sortDir={}", statusValue, datePostedValue, sortDir);
 
-        if (datePostedValue != null) {
-            keyBuilder.sortValue(datePostedValue);
+        // Build QueryConditional based on sort direction
+        if ("desc".equalsIgnoreCase(sortDir)) {
+            // Use a high synthetic date if null, to start from the newest
+            String startSortKey = (datePostedValue != null) ? datePostedValue : ZonedDateTime.now().plusYears(10).toString();
+            keyBuilder.sortValue(startSortKey);
+            log.info("Using QueryConditional.sortLessThanOrEqualTo with key: {}", keyBuilder.build());
+            builder.queryConditional(QueryConditional.sortLessThanOrEqualTo(keyBuilder.build()));
+        } else {
+            // Use a low synthetic date if null, to start from the earliest
+            String startSortKey = (datePostedValue != null) ? datePostedValue : ZonedDateTime.ofInstant(Instant.EPOCH, ZoneOffset.UTC).toString();
+            keyBuilder.sortValue(startSortKey);
             log.info("Using QueryConditional.sortGreaterThanOrEqualTo with key: {}", keyBuilder.build());
             builder.queryConditional(QueryConditional.sortGreaterThanOrEqualTo(keyBuilder.build()));
-        } else {
-            log.info("Using QueryConditional.keyEqualTo with key: {}", keyBuilder.build());
-            builder.queryConditional(QueryConditional.keyEqualTo(keyBuilder.build()));
         }
 
-        // Sanitize and apply exclusiveStartKey
+        // Apply exclusiveStartKey for pagination
         if (paginationToken != null) {
             String exclusiveStatus = paginationToken.get("status");
             String exclusiveDate = paginationToken.get("datePosted");
@@ -73,46 +82,14 @@ public class FilterAdHelper {
             String search
     ) {
         return items.stream()
-                .filter(ad -> {
-                    // Debug logging for each filter
-                    log.debug("Checking ad: {}", ad.getId());
-
-                    // Category filter (case-insensitive and trimmed)
-                    if (category != null && !category.trim().equalsIgnoreCase(ad.getCategory())) {
-                        log.debug("Category filter failed: {} != {}", category.trim(), ad.getCategory());
-                        return false;
-                    }
-
-                    // Location filter
-                    if (location != null && !location.trim().equalsIgnoreCase(ad.getLocation())) {
-                        log.debug("Location filter failed");
-                        return false;
-                    }
-
-                    // Condition filter
-                    if (condition != null && !condition.trim().equalsIgnoreCase(ad.getCondition())) {
-                        log.debug("Condition filter failed");
-                        return false;
-                    }
-
-                    // Price filters
-                    if (minPrice != null && ad.getPrice() < minPrice) {
-                        log.debug("MinPrice filter failed");
-                        return false;
-                    }
-                    if (maxPrice != null && ad.getPrice() > maxPrice) {
-                        log.debug("MaxPrice filter failed");
-                        return false;
-                    }
-
-                    // Search filter
-                    if (search != null && !ad.getTitle().toLowerCase().contains(search.toLowerCase().trim())) {
-                        log.debug("Search filter failed");
-                        return false;
-                    }
-
-                    return true;
-                })
+                .filter(ad ->
+                        (category == null || category.equalsIgnoreCase(ad.getCategory())) &&
+                                (location == null || location.equalsIgnoreCase(ad.getLocation())) &&
+                                (condition == null || condition.equalsIgnoreCase(ad.getCondition())) &&
+                                (minPrice == null || ad.getPrice() >= minPrice) &&
+                                (maxPrice == null || ad.getPrice() <= maxPrice) &&
+                                (search == null || ad.getTitle().toLowerCase().contains(search.toLowerCase()))
+                )
                 .collect(Collectors.toList());
     }
 
