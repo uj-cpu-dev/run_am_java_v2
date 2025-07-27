@@ -108,7 +108,6 @@ public class UserAdService {
         adValidator.validateAdUpdate(existingAd);
         userAdRepository.save(existingAd);
     }
-
     public List<UserAd> getAllAdsByUserId(String userId) {
         return userAdRepository.findByUserId(userId);
     }
@@ -188,14 +187,17 @@ public class UserAdService {
             String sortDir,
             Map<String, String> paginationToken
     ) {
-        log.info("Filtering ads with status={}, sortBy={}, sortDir={}, paginationToken={}", statusStr, sortBy, sortDir, paginationToken);
-
         UserAd.AdStatus status = FilterAdHelper.parseStatus(statusStr);
 
         DynamoDbIndex<UserAd> index = dynamoDbUtilHelper.getUserAdsTable().getRawTable()
                 .index("status-datePosted-index");
 
-        QueryEnhancedRequest queryRequest = buildQueryRequest(status, sortDir, paginationToken);
+        QueryEnhancedRequest queryRequest;
+        try {
+            queryRequest = buildQueryRequest(status, sortDir, paginationToken);
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException("Failed to build query request: " + e.getMessage(), e);
+        }
 
         SdkIterable<Page<UserAd>> sdkPages = index.query(queryRequest);
         Iterator<Page<UserAd>> iterator = sdkPages.iterator();
@@ -205,16 +207,12 @@ public class UserAdService {
 
         if (iterator.hasNext()) {
             Page<UserAd> page = iterator.next();
-            log.info("Fetched page with {} items. LastEvaluatedKey={}", page.items().size(), page.lastEvaluatedKey());
             result.addAll(filterPageItems(page.items(), category, location, condition, minPrice, maxPrice, search));
             lastEvaluatedKey = page.lastEvaluatedKey();
-        } else {
-            log.warn("No items returned from query.");
         }
 
         sortResults(result, sortBy, sortDir);
         Map<String, String> nextToken = buildPaginationToken(lastEvaluatedKey);
-        log.info("Returning {} items. NextToken={}, hasNext={}", result.size(), nextToken, nextToken != null);
 
         return new FilteredAdResponse(result, nextToken, nextToken != null);
     }

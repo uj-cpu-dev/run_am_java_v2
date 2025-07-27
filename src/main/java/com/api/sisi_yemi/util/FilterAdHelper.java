@@ -33,25 +33,23 @@ public class FilterAdHelper {
 
         Key.Builder keyBuilder = Key.builder().partitionValue(statusValue);
         QueryEnhancedRequest.Builder builder = QueryEnhancedRequest.builder()
-                .scanIndexForward("asc".equalsIgnoreCase(sortDir))  // Important: for DynamoDB sort order
+                .scanIndexForward("asc".equalsIgnoreCase(sortDir))
                 .limit(20);
 
-        log.info("Building QueryConditional for status={}, datePosted={}, sortDir={}", statusValue, datePostedValue, sortDir);
-
         // Build QueryConditional based on sort direction
-        if ("desc".equalsIgnoreCase(sortDir)) {
-            // Use a high synthetic date if null, to start from the newest
-            String startSortKey = (datePostedValue != null) ? datePostedValue : ZonedDateTime.now().plusYears(10).toString();
-            keyBuilder.sortValue(startSortKey);
-            log.info("Using QueryConditional.sortLessThanOrEqualTo with key: {}", keyBuilder.build());
-            builder.queryConditional(QueryConditional.sortLessThanOrEqualTo(keyBuilder.build()));
-        } else {
-            // Use a low synthetic date if null, to start from the earliest
-            String startSortKey = (datePostedValue != null) ? datePostedValue : ZonedDateTime.ofInstant(Instant.EPOCH, ZoneOffset.UTC).toString();
-            keyBuilder.sortValue(startSortKey);
-            log.info("Using QueryConditional.sortGreaterThanOrEqualTo with key: {}", keyBuilder.build());
-            builder.queryConditional(QueryConditional.sortGreaterThanOrEqualTo(keyBuilder.build()));
-        }
+        String sortKey = (datePostedValue != null)
+                ? datePostedValue
+                : ("desc".equalsIgnoreCase(sortDir)
+                ? ZonedDateTime.now().plusYears(10).toString()
+                : ZonedDateTime.ofInstant(Instant.EPOCH, ZoneOffset.UTC).toString());
+
+        keyBuilder.sortValue(sortKey);
+
+        builder.queryConditional(
+                "desc".equalsIgnoreCase(sortDir)
+                        ? QueryConditional.sortLessThanOrEqualTo(keyBuilder.build())
+                        : QueryConditional.sortGreaterThanOrEqualTo(keyBuilder.build())
+        );
 
         // Apply exclusiveStartKey for pagination
         if (paginationToken != null) {
@@ -62,10 +60,9 @@ public class FilterAdHelper {
                 Map<String, AttributeValue> startKey = new HashMap<>();
                 startKey.put("status", AttributeValue.fromS(exclusiveStatus));
                 startKey.put("datePosted", AttributeValue.fromS(exclusiveDate));
-                log.info("Using exclusiveStartKey: {}", startKey);
                 builder.exclusiveStartKey(startKey);
             } else {
-                log.info("No valid exclusiveStartKey found in token: {}", paginationToken);
+                throw new IllegalArgumentException("Invalid pagination token: missing 'status' or 'datePosted'");
             }
         }
 
