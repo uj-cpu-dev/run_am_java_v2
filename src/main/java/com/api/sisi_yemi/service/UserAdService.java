@@ -8,6 +8,7 @@ import com.api.sisi_yemi.repository.UserAdDynamoDbRepository;
 import com.api.sisi_yemi.repository.UserAdDynamoDbRepositoryImpl;
 import com.api.sisi_yemi.util.AdValidator;
 import com.api.sisi_yemi.util.DynamoDbUtilHelper;
+import com.api.sisi_yemi.util.FilterAdHelper;
 import com.api.sisi_yemi.util.ImageUploader;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +27,8 @@ import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static com.api.sisi_yemi.util.FilterAdHelper.*;
 
 @Service
 @RequiredArgsConstructor
@@ -190,33 +193,13 @@ public class UserAdService {
             String sortDir,
             Map<String, String> paginationToken
     ) {
-        UserAd.AdStatus status;
-        try {
-            status = UserAd.AdStatus.valueOf(statusStr.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Invalid status: " + statusStr);
-        }
+        UserAd.AdStatus status = FilterAdHelper.parseStatus(statusStr);
+        DynamoDbIndex<UserAd> index = dynamoDbUtilHelper.getUserAdsTable().getRawTable()
+                .index("status-datePosted-index");
 
-        DynamoDbTable<UserAd> table = dynamoDbUtilHelper.getUserAdsTable().getRawTable();
-        DynamoDbIndex<UserAd> index = table.index("status-datePosted-index");
+        QueryEnhancedRequest queryRequest = buildQueryRequest(status, sortDir, paginationToken);
 
-        QueryEnhancedRequest.Builder queryBuilder = QueryEnhancedRequest.builder()
-                .queryConditional(QueryConditional.keyEqualTo(Key.builder().partitionValue(status.ordinal()).build()))
-                .scanIndexForward("asc".equalsIgnoreCase(sortDir))
-                .limit(20); // Set your desired page size here
-
-        // Handle pagination token
-        if (paginationToken != null && !paginationToken.isEmpty()) {
-            Map<String, AttributeValue> startKey = paginationToken.entrySet().stream()
-                    .collect(Collectors.toMap(
-                            Map.Entry::getKey,
-                            e -> AttributeValue.fromS(e.getValue())
-                    ));
-            queryBuilder.exclusiveStartKey(startKey);
-        }
-
-        // Run the query
-        SdkIterable<Page<UserAd>> sdkPages = index.query(queryBuilder.build());
+        SdkIterable<Page<UserAd>> sdkPages = index.query(queryRequest);
         Iterator<Page<UserAd>> iterator = sdkPages.iterator();
 
         List<UserAd> result = new ArrayList<>();
@@ -224,42 +207,12 @@ public class UserAdService {
 
         if (iterator.hasNext()) {
             Page<UserAd> page = iterator.next();
-            page.items().stream()
-                    .filter(ad ->
-                            (category == null || category.equalsIgnoreCase(ad.getCategory())) &&
-                                    (location == null || location.equalsIgnoreCase(ad.getLocation())) &&
-                                    (condition == null || condition.equalsIgnoreCase(ad.getCondition())) &&
-                                    (minPrice == null || ad.getPrice() >= minPrice) &&
-                                    (maxPrice == null || ad.getPrice() <= maxPrice) &&
-                                    (search == null || ad.getTitle().toLowerCase().contains(search.toLowerCase()))
-                    )
-                    .forEach(result::add);
-
+            result.addAll(filterPageItems(page.items(), category, location, condition, minPrice, maxPrice, search));
             lastEvaluatedKey = page.lastEvaluatedKey();
         }
 
-        // Sorting (in-memory)
-        Comparator<UserAd> comparator = switch (sortBy) {
-            case "price" -> Comparator.comparing(UserAd::getPrice);
-            case "datePosted" -> Comparator.comparing(UserAd::getDatePosted);
-            default -> Comparator.comparing(UserAd::getDatePosted);
-        };
-
-        if ("desc".equalsIgnoreCase(sortDir)) {
-            comparator = comparator.reversed();
-        }
-
-        result.sort(comparator);
-
-        // Convert lastEvaluatedKey to string map
-        Map<String, String> nextToken = null;
-        if (lastEvaluatedKey != null && !lastEvaluatedKey.isEmpty()) {
-            nextToken = lastEvaluatedKey.entrySet().stream()
-                    .collect(Collectors.toMap(
-                            Map.Entry::getKey,
-                            e -> e.getValue().s() // Assuming all keys are strings
-                    ));
-        }
+        sortResults(result, sortBy, sortDir);
+        Map<String, String> nextToken = buildPaginationToken(lastEvaluatedKey);
 
         return new FilteredAdResponse(result, nextToken, nextToken != null);
     }
