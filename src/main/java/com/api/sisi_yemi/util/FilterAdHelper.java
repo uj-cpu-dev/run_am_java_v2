@@ -25,24 +25,29 @@ public class FilterAdHelper {
     }
 
     public static QueryEnhancedRequest buildQueryRequest(UserAd.AdStatus status, String sortDir, Map<String, String> paginationToken) {
+        Key.Builder keyBuilder = Key.builder().partitionValue(status.name());
+
+        if (paginationToken != null && !paginationToken.isEmpty()) {
+            String datePostedValue = paginationToken.get("datePosted");
+            if (datePostedValue != null) {
+                keyBuilder.sortValue(datePostedValue);
+            }
+        }
+
         QueryEnhancedRequest.Builder builder = QueryEnhancedRequest.builder()
-                .queryConditional(QueryConditional.keyEqualTo(
-                        Key.builder().partitionValue(status.name()).build()))
+                .queryConditional(QueryConditional.sortGreaterThanOrEqualTo(keyBuilder.build()))
                 .scanIndexForward("asc".equalsIgnoreCase(sortDir))
                 .limit(20);
 
         if (paginationToken != null && !paginationToken.isEmpty()) {
-            Map<String, AttributeValue> startKey = new HashMap<>();
-
             String statusValue = paginationToken.get("status");
             String datePostedValue = paginationToken.get("datePosted");
 
             if (statusValue != null && datePostedValue != null) {
+                Map<String, AttributeValue> startKey = new HashMap<>();
                 startKey.put("status", AttributeValue.fromS(statusValue));
                 startKey.put("datePosted", AttributeValue.fromS(datePostedValue));
                 builder.exclusiveStartKey(startKey);
-            } else {
-                log.warn("Incomplete pagination token. Both 'status' and 'datePosted' are required.");
             }
         }
 
