@@ -25,7 +25,7 @@ public class FilterAdHelper {
     public static QueryEnhancedRequest buildQueryRequest(UserAd.AdStatus status, String sortDir, Map<String, String> paginationToken) {
         QueryEnhancedRequest.Builder builder = QueryEnhancedRequest.builder()
                 .queryConditional(QueryConditional.keyEqualTo(
-                        Key.builder().partitionValue(status.ordinal()).build()))
+                        Key.builder().partitionValue(status.name()).build())) // Use name() instead of ordinal()
                 .scanIndexForward("asc".equalsIgnoreCase(sortDir))
                 .limit(20);
 
@@ -33,14 +33,8 @@ public class FilterAdHelper {
             Map<String, AttributeValue> startKey = new HashMap<>();
 
             if (paginationToken.containsKey("status")) {
-                String statusString = paginationToken.get("status");
-                try {
-                    // Convert "ACTIVE" -> UserAd.AdStatus -> ordinal -> stringified number
-                    UserAd.AdStatus parsedStatus = UserAd.AdStatus.valueOf(statusString.toUpperCase());
-                    startKey.put("status", AttributeValue.fromN(String.valueOf(parsedStatus.ordinal())));
-                } catch (IllegalArgumentException e) {
-                    throw new IllegalArgumentException("Invalid pagination token: unknown status " + statusString);
-                }
+                // Store status as string in pagination token
+                startKey.put("status", AttributeValue.fromS(paginationToken.get("status")));
             }
 
             if (paginationToken.containsKey("datePosted")) {
