@@ -36,16 +36,14 @@ public class Conversation {
     }
 
     // GSI for querying by participant or seller
-    @DynamoDbSecondaryPartitionKey(indexNames = {"participantId-index", "sellerId-index"})
+    @DynamoDbSecondaryPartitionKey(indexNames = "participantId-index")
     public String getParticipantId() {
         return participantId;
     }
-
     @DynamoDbSecondaryPartitionKey(indexNames = "sellerId-index")
     public String getSellerId() {
         return sellerId;
     }
-
     @DynamoDbSecondarySortKey(indexNames = "participantId-userAdId-index")
     public String getUserAdId() {
         return userAdId;

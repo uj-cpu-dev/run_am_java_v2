@@ -1,6 +1,7 @@
 package com.api.sisi_yemi.repository;
 
 import com.api.sisi_yemi.model.Conversation;
+import com.api.sisi_yemi.util.DynamoDbUtilHelper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Repository;
@@ -12,15 +13,14 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-@Component
-@RequiredArgsConstructor
 @Repository
+@RequiredArgsConstructor
 public class ConversationDynamoDbRepositoryImpl implements ConversationDynamoDbRepository {
 
-    private final DynamoDbEnhancedClient enhancedClient;
+    private final DynamoDbUtilHelper dynamoDbUtilHelper;
 
     private DynamoDbTable<Conversation> table() {
-        return enhancedClient.table("conversations", TableSchema.fromBean(Conversation.class));
+        return dynamoDbUtilHelper.getConversationTable().getRawTable();
     }
 
     @Override
