@@ -207,7 +207,16 @@ public class UserAdController {
             @RequestParam(defaultValue = "desc") String sortDir,
             @RequestParam(required = false) Map<String, String> paginationToken
     ) {
-        List<FilteredAdResponse> ads = Collections.singletonList(userAdService.filterAds(status, category, location, condition, minPrice, maxPrice, search, sortBy, sortDir, paginationToken));
+        // Trim all string inputs
+        if (category != null) category = category.trim();
+        if (location != null) location = location.trim();
+        if (condition != null) condition = condition.trim();
+        if (search != null) search = search.trim();
+
+        List<FilteredAdResponse> ads = Collections.singletonList(
+                userAdService.filterAds(status, category, location, condition,
+                        minPrice, maxPrice, search, sortBy, sortDir, paginationToken)
+        );
         return ResponseEntity.ok(ads);
     }
 }
