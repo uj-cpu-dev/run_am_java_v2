@@ -25,30 +25,32 @@ public class FilterAdHelper {
     }
 
     public static QueryEnhancedRequest buildQueryRequest(UserAd.AdStatus status, String sortDir, Map<String, String> paginationToken) {
-        Key.Builder keyBuilder = Key.builder().partitionValue(status.name());
-
-        if (paginationToken != null && !paginationToken.isEmpty()) {
-            String datePostedValue = paginationToken.get("datePosted");
-            if (datePostedValue != null) {
-                keyBuilder.sortValue(datePostedValue);
-            }
-        }
-
         QueryEnhancedRequest.Builder builder = QueryEnhancedRequest.builder()
-                .queryConditional(QueryConditional.sortGreaterThanOrEqualTo(keyBuilder.build()))
                 .scanIndexForward("asc".equalsIgnoreCase(sortDir))
                 .limit(20);
 
-        if (paginationToken != null && !paginationToken.isEmpty()) {
-            String statusValue = paginationToken.get("status");
-            String datePostedValue = paginationToken.get("datePosted");
+        String statusValue = status.name();
+        String datePostedValue = paginationToken != null ? paginationToken.get("datePosted") : null;
 
-            if (statusValue != null && datePostedValue != null) {
-                Map<String, AttributeValue> startKey = new HashMap<>();
-                startKey.put("status", AttributeValue.fromS(statusValue));
-                startKey.put("datePosted", AttributeValue.fromS(datePostedValue));
-                builder.exclusiveStartKey(startKey);
-            }
+        Key.Builder keyBuilder = Key.builder().partitionValue(statusValue);
+
+        // Choose query conditional based on presence of sort key
+        if (datePostedValue != null) {
+            keyBuilder.sortValue(datePostedValue);
+            builder.queryConditional(QueryConditional.sortGreaterThanOrEqualTo(keyBuilder.build()));
+        } else {
+            builder.queryConditional(QueryConditional.keyEqualTo(keyBuilder.build()));
+        }
+
+        // If both keys are present, use as exclusiveStartKey
+        if (paginationToken != null &&
+                paginationToken.containsKey("status") &&
+                paginationToken.containsKey("datePosted")) {
+
+            Map<String, AttributeValue> startKey = new HashMap<>();
+            startKey.put("status", AttributeValue.fromS(paginationToken.get("status")));
+            startKey.put("datePosted", AttributeValue.fromS(paginationToken.get("datePosted")));
+            builder.exclusiveStartKey(startKey);
         }
 
         return builder.build();
