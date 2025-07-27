@@ -188,7 +188,10 @@ public class UserAdService {
             String sortDir,
             Map<String, String> paginationToken
     ) {
+        log.info("Filtering ads with status={}, sortBy={}, sortDir={}, paginationToken={}", statusStr, sortBy, sortDir, paginationToken);
+
         UserAd.AdStatus status = FilterAdHelper.parseStatus(statusStr);
+
         DynamoDbIndex<UserAd> index = dynamoDbUtilHelper.getUserAdsTable().getRawTable()
                 .index("status-datePosted-index");
 
@@ -202,12 +205,16 @@ public class UserAdService {
 
         if (iterator.hasNext()) {
             Page<UserAd> page = iterator.next();
+            log.info("Fetched page with {} items. LastEvaluatedKey={}", page.items().size(), page.lastEvaluatedKey());
             result.addAll(filterPageItems(page.items(), category, location, condition, minPrice, maxPrice, search));
             lastEvaluatedKey = page.lastEvaluatedKey();
+        } else {
+            log.warn("No items returned from query.");
         }
 
         sortResults(result, sortBy, sortDir);
         Map<String, String> nextToken = buildPaginationToken(lastEvaluatedKey);
+        log.info("Returning {} items. NextToken={}, hasNext={}", result.size(), nextToken, nextToken != null);
 
         return new FilteredAdResponse(result, nextToken, nextToken != null);
     }

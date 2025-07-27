@@ -25,24 +25,28 @@ public class FilterAdHelper {
     }
 
     public static QueryEnhancedRequest buildQueryRequest(UserAd.AdStatus status, String sortDir, Map<String, String> paginationToken) {
-        QueryEnhancedRequest.Builder builder = QueryEnhancedRequest.builder()
-                .scanIndexForward("asc".equalsIgnoreCase(sortDir))
-                .limit(20);
-
         String statusValue = status.name();
         String datePostedValue = paginationToken != null ? paginationToken.get("datePosted") : null;
 
         Key.Builder keyBuilder = Key.builder().partitionValue(statusValue);
 
-        // Choose query conditional based on presence of sort key
+        QueryEnhancedRequest.Builder builder = QueryEnhancedRequest.builder()
+                .scanIndexForward("asc".equalsIgnoreCase(sortDir))
+                .limit(20);
+
+        log.info("Building QueryConditional for status={}, datePosted={}, sortDir={}", statusValue, datePostedValue, sortDir);
+
+        // Important: only use sort-based condition if sort key is present
         if (datePostedValue != null) {
             keyBuilder.sortValue(datePostedValue);
             builder.queryConditional(QueryConditional.sortGreaterThanOrEqualTo(keyBuilder.build()));
+            log.info("Using QueryConditional.sortGreaterThanOrEqualTo with key: {}", keyBuilder.build());
         } else {
             builder.queryConditional(QueryConditional.keyEqualTo(keyBuilder.build()));
+            log.info("Using QueryConditional.keyEqualTo with key: {}", keyBuilder.build());
         }
 
-        // If both keys are present, use as exclusiveStartKey
+        // Set exclusiveStartKey if full paginationToken is present
         if (paginationToken != null &&
                 paginationToken.containsKey("status") &&
                 paginationToken.containsKey("datePosted")) {
@@ -50,7 +54,11 @@ public class FilterAdHelper {
             Map<String, AttributeValue> startKey = new HashMap<>();
             startKey.put("status", AttributeValue.fromS(paginationToken.get("status")));
             startKey.put("datePosted", AttributeValue.fromS(paginationToken.get("datePosted")));
+
             builder.exclusiveStartKey(startKey);
+            log.info("Setting exclusiveStartKey: {}", startKey);
+        } else {
+            log.info("No valid exclusiveStartKey found in token: {}", paginationToken);
         }
 
         return builder.build();
