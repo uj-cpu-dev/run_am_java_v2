@@ -33,7 +33,7 @@ public class FilterAdHelper {
             Map<String, AttributeValue> startKey = new HashMap<>();
 
             if (paginationToken.containsKey("status")) {
-                // Store status as string in pagination token
+                // Store as string to match GSI definition
                 startKey.put("status", AttributeValue.fromS(paginationToken.get("status")));
             }
 
@@ -86,8 +86,8 @@ public class FilterAdHelper {
         if (lastEvaluatedKey == null || lastEvaluatedKey.isEmpty()) return null;
 
         Map<String, String> token = new HashMap<>();
-        if (lastEvaluatedKey.containsKey("status") && lastEvaluatedKey.get("status").n() != null) {
-            token.put("status", lastEvaluatedKey.get("status").n());
+        if (lastEvaluatedKey.containsKey("status") && lastEvaluatedKey.get("status").s() != null) {
+            token.put("status", lastEvaluatedKey.get("status").s()); // Get as string
         }
         if (lastEvaluatedKey.containsKey("datePosted") && lastEvaluatedKey.get("datePosted").s() != null) {
             token.put("datePosted", lastEvaluatedKey.get("datePosted").s());
