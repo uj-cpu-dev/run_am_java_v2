@@ -31,12 +31,22 @@ public class FilterAdHelper {
 
         if (paginationToken != null && !paginationToken.isEmpty()) {
             Map<String, AttributeValue> startKey = new HashMap<>();
+
             if (paginationToken.containsKey("status")) {
-                startKey.put("status", AttributeValue.fromN(paginationToken.get("status")));
+                String statusString = paginationToken.get("status");
+                try {
+                    // Convert "ACTIVE" -> UserAd.AdStatus -> ordinal -> stringified number
+                    UserAd.AdStatus parsedStatus = UserAd.AdStatus.valueOf(statusString.toUpperCase());
+                    startKey.put("status", AttributeValue.fromN(String.valueOf(parsedStatus.ordinal())));
+                } catch (IllegalArgumentException e) {
+                    throw new IllegalArgumentException("Invalid pagination token: unknown status " + statusString);
+                }
             }
+
             if (paginationToken.containsKey("datePosted")) {
                 startKey.put("datePosted", AttributeValue.fromS(paginationToken.get("datePosted")));
             }
+
             builder.exclusiveStartKey(startKey);
         }
 
