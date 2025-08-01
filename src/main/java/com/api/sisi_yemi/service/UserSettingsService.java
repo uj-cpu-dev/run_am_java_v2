@@ -3,6 +3,7 @@ package com.api.sisi_yemi.service;
 import com.api.sisi_yemi.dto.UserSettingsResponse;
 import com.api.sisi_yemi.dto.UserSettingsUpdateRequest;
 import com.api.sisi_yemi.model.UserSettings;
+import com.api.sisi_yemi.util.DynamoDbUtilHelper;
 import com.api.sisi_yemi.util.dynamodb.DynamoDbHelper;
 import com.api.sisi_yemi.util.dynamodb.DynamoDbHelperFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,18 +12,15 @@ import org.springframework.stereotype.Service;
 @Service
 public class UserSettingsService {
 
-    private final DynamoDbHelperFactory dynamoDbHelperFactory;
+    private final DynamoDbUtilHelper dynamoDbUtilHelper;
 
-    private final String USER_SETTINGS_TABLE;
-
-    public UserSettingsService(DynamoDbHelperFactory dynamoDbHelperFactory, @Value("${users.settings.table}")String USER_SETTINGS_TABLE) {
-        this.dynamoDbHelperFactory = dynamoDbHelperFactory;
-        this.USER_SETTINGS_TABLE = USER_SETTINGS_TABLE;
+    public UserSettingsService(DynamoDbUtilHelper dynamoDbUtilHelper) {
+        this.dynamoDbUtilHelper = dynamoDbUtilHelper;
     }
 
     public UserSettings getSettings(String userId) {
-        DynamoDbHelper<UserSettings> userHelper = dynamoDbHelperFactory.getHelper(USER_SETTINGS_TABLE, UserSettings.class);
-        return userHelper.getById(userId)
+        DynamoDbHelper<UserSettings> userSettingsTable = dynamoDbUtilHelper.getUserSettingsTable();
+        return userSettingsTable.getById(userId)
                 .orElseGet(() -> createDefaultSettings(userId));
     }
 
@@ -55,15 +53,14 @@ public class UserSettingsService {
         if (updates.getPublicProfile() != null)
             settings.setPublicProfile(updates.getPublicProfile());
 
-        DynamoDbHelper<UserSettings> userHelper = dynamoDbHelperFactory.getHelper(USER_SETTINGS_TABLE, UserSettings.class);
-
-        userHelper.save(settings);
+        DynamoDbHelper<UserSettings> userSettingsTable = dynamoDbUtilHelper.getUserSettingsTable();
+        userSettingsTable.save(settings);
     };
 
 
     private UserSettings getExistingOrCreateDefault(String userId) {
-        DynamoDbHelper<UserSettings> userHelper = dynamoDbHelperFactory.getHelper(USER_SETTINGS_TABLE, UserSettings.class);
-        return userHelper.getById(userId)
+        DynamoDbHelper<UserSettings> userSettingsTable = dynamoDbUtilHelper.getUserSettingsTable();
+        return userSettingsTable.getById(userId)
                 .orElseGet(() -> createDefaultSettings(userId));
     }
 

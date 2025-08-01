@@ -31,5 +31,10 @@ public class DynamoDbUtilHelper {
     public DynamoDbHelper<UserAd> getUserAdsTable() {
         return factory.getHelper("user_ads", UserAd.class);
     }
+
+    public DynamoDbHelper<UserSettings> getUserSettingsTable() {
+        return factory.getHelper("user_settings", UserSettings.class);
+    }
+
 }
 

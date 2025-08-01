@@ -16,7 +16,6 @@ import java.time.Instant;
 @DynamoDbBean
 public class UserSettings {
 
-    private String id;
     private String userId;
 
     // Notification settings
@@ -37,7 +36,7 @@ public class UserSettings {
     private Instant lastUpdated;
 
     @DynamoDbPartitionKey
-    public String getId() {
-        return id;
+    public String getUserId() {
+        return userId;
     }
 }
