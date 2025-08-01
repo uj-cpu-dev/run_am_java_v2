@@ -5,8 +5,6 @@ import com.api.sisi_yemi.dto.UserSettingsUpdateRequest;
 import com.api.sisi_yemi.model.UserSettings;
 import com.api.sisi_yemi.util.DynamoDbUtilHelper;
 import com.api.sisi_yemi.util.dynamodb.DynamoDbHelper;
-import com.api.sisi_yemi.util.dynamodb.DynamoDbHelperFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -66,6 +64,7 @@ public class UserSettingsService {
 
     private UserSettings createDefaultSettings(String userId) {
         return UserSettings.builder()
+                .id(userId)
                 .userId(userId)
                 .emailNotifications(true)
                 .pushNotifications(true)
