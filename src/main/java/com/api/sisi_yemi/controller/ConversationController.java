@@ -61,7 +61,7 @@ public class ConversationController {
 
             if (existing.isPresent()) {
                 log.info("Existing conversation found for userId={} and itemId={}", userId, request.getItemId());
-                ConversationDto existingDto = conversationService.convertToSecureDto(existing.get());
+                ConversationDto existingDto = conversationService.convertToSecureDto(existing.get(), userId);
                 return ResponseEntity.ok(existingDto); // 200 OK for existing
             }
 
