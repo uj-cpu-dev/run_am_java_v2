@@ -12,7 +12,7 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
-/*@Configuration
+@Configuration
 public class AwsConfigDev {
 
     private final String accessKeyId;
@@ -53,4 +53,4 @@ public class AwsConfigDev {
                 .credentialsProvider(DefaultCredentialsProvider.create())
                 .build();
     }
-}*/
+}
