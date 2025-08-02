@@ -30,6 +30,19 @@ public class Conversation {
     private User seller;
     private UserAd userAd;
 
+    private int participantUnread;  // Unread count for participant
+    private int sellerUnread;      // Unread count for seller
+
+    // Helper method to get unread count for a user
+    public int getUnreadForUser(String userId) {
+        if (userId.equals(participantId)) {
+            return participantUnread;
+        } else if (userId.equals(sellerId)) {
+            return sellerUnread;
+        }
+        return 0;
+    }
+
     @DynamoDbPartitionKey
     public String getId() {
         return id;

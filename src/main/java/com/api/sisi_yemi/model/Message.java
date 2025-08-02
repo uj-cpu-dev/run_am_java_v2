@@ -9,6 +9,8 @@ import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbParti
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSortKey;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 @DynamoDbBean
 @Data
@@ -22,8 +24,18 @@ public class Message {
     private String senderId;
     private String content;
     private String status;
-    private boolean read;
     private LocalDateTime timestamp;
+
+    private Set<String> readBy = new HashSet<>();
+
+    // Add helper methods
+    public boolean isReadBy(String userId) {
+        return readBy.contains(userId);
+    }
+
+    public void markReadBy(String userId) {
+        readBy.add(userId);
+    }
 
     @DynamoDbPartitionKey
     public String getConversationId() {

@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -56,7 +57,7 @@ public class MessageService {
                 .content(content)
                 .timestamp(LocalDateTime.now())
                 .status("delivered")
-                .read(false)
+                .readBy(new HashSet<>())
                 .build();
 
         msgTable.save(message);
@@ -113,16 +114,34 @@ public class MessageService {
 
         List<Message> unreadMessages = msgTable.findAll().stream()
                 .filter(msg -> msg.getConversationId().equals(conversationId))
-                .filter(msg -> !msg.isRead() && !msg.getSenderId().equals(userId))
+                .filter(msg -> !msg.getSenderId().equals(userId) && !msg.isReadBy(userId))
                 .toList();
 
+        // Mark messages as read by this user
         for (Message msg : unreadMessages) {
-            msg.setRead(true);
+            msg.markReadBy(userId);
             msgTable.save(msg);
         }
 
-        conversation.setUnread(0);
-        convTable.save(conversation);
+        updateUnreadCount(conversation, userId);
+    }
+
+    private void updateUnreadCount(Conversation conversation, String userId) {
+        DynamoDbHelper<Message> msgTable = dynamoDbUtilHelper.getMessageTable();
+
+        long unreadCount = msgTable.findAll().stream()
+                .filter(msg -> msg.getConversationId().equals(conversation.getId()))
+                .filter(msg -> !msg.getSenderId().equals(userId) && !msg.isReadBy(userId))
+                .count();
+
+        // Update conversation based on who is viewing
+        if (userId.equals(conversation.getParticipantId())) {
+            conversation.setParticipantUnread((int) unreadCount);
+        } else {
+            conversation.setSellerUnread((int) unreadCount);
+        }
+
+        dynamoDbUtilHelper.getConversationTable().save(conversation);
     }
 
     private MessageDto convertToDto(Message message, User sender) {

@@ -36,7 +36,7 @@ public class ConversationService {
         try {
             return conversationRepository.findByUser(userId)
                     .stream()
-                    .map(this::convertToSecureDto)
+                    .map(conv -> convertToSecureDto(conv, userId)) // Pass userId
                     .collect(Collectors.toList());
         } catch (Exception e) {
             throw new ApiException("Failed to retrieve conversations", INTERNAL_SERVER_ERROR, "CONVERSATION_RETRIEVAL_ERROR");
@@ -72,22 +72,23 @@ public class ConversationService {
                 .build();
 
         Conversation saved = conversationRepository.save(conversation);
-        return convertToSecureDto(saved);
+        return convertToSecureDto(saved, buyer.getId());
     }
 
-    public ConversationDto convertToSecureDto(Conversation conversation) {
+    public ConversationDto convertToSecureDto(Conversation conversation, String currentUserId) {
         ConversationDto dto = new ConversationDto();
         dto.setId(conversation.getId());
 
-        // Only include participant (buyer) info
-        dto.setParticipant(convertToUserDto(conversation.getParticipant()));
+        if (currentUserId.equals(conversation.getParticipantId())) {
+            dto.setParticipant(convertToUserDto(conversation.getSeller()));
+        } else {
+            dto.setParticipant(convertToUserDto(conversation.getParticipant()));
+        }
 
-        // Include item info without seller reference
         dto.setItem(convertUserAdToItemDto(conversation.getUserAd()));
-
         dto.setLastMessage(conversation.getLastMessage());
         dto.setTimestamp(conversation.getTimestamp());
-        dto.setUnread(conversation.getUnread());
+        dto.setUnread(conversation.getUnreadForUser(currentUserId)); // User-specific unread count
         dto.setStatus(conversation.getStatus());
 
         return dto;
