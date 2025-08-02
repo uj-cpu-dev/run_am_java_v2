@@ -1,4 +1,4 @@
-package com.api.sisi_yemi.config;
+/*package com.api.sisi_yemi.config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -53,4 +53,4 @@ public class AwsConfigDev {
                 .credentialsProvider(DefaultCredentialsProvider.create())
                 .build();
     }
-}
+}*/
