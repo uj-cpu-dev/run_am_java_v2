@@ -92,7 +92,7 @@ public class MessageService {
                 .content(content)
                 .timestamp(LocalDateTime.now())
                 .status("delivered")
-                .readBy(Collections.emptySet()) // Initialize with empty set
+                .readBy(null)
                 .build();
     }
 
