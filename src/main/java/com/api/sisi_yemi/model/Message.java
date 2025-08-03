@@ -20,6 +20,7 @@ import java.util.Set;
 @Builder
 @DynamoDbBean
 public class Message {
+
     private String conversationId;
     private String messageId;
     private String senderId;
@@ -27,6 +28,7 @@ public class Message {
     private String status;
     private LocalDateTime timestamp;
     private Set<String> readBy;
+    private boolean isDeleted;
 
     @DynamoDbPartitionKey
     public String getConversationId() {
@@ -40,22 +42,22 @@ public class Message {
 
     @DynamoDbAttribute("readBy")
     public Set<String> getReadBy() {
-        if (readBy == null || readBy.isEmpty()) {
-            return null; // Return null instead of empty set
-        }
-        return readBy;
+        return (readBy == null || readBy.isEmpty()) ? null : readBy;
     }
 
     public void setReadBy(Set<String> readBy) {
         this.readBy = (readBy == null || readBy.isEmpty()) ? null : readBy;
     }
 
-    // Helper method to check if read by user
+    public void softDelete() {
+        this.isDeleted = true;
+        this.content = "[Message deleted]";
+    }
+
     public boolean isReadBy(String userId) {
         return readBy != null && readBy.contains(userId);
     }
 
-    // Helper method to mark as read
     public void markReadBy(String userId) {
         if (readBy == null) {
             readBy = new HashSet<>();

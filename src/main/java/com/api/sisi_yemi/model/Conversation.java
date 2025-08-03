@@ -4,10 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSecondaryPartitionKey;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSecondarySortKey;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
 
 import java.time.LocalDateTime;
 
@@ -29,6 +26,7 @@ public class Conversation {
     private User participant;
     private User seller;
     private UserAd userAd;
+    private String lastMessageId;
 
     private int participantUnread;  // Unread count for participant
     private int sellerUnread;      // Unread count for seller
@@ -41,6 +39,11 @@ public class Conversation {
             return sellerUnread;
         }
         return 0;
+    }
+
+    @DynamoDbAttribute("lastMessageId")
+    public String getLastMessageId() {
+        return lastMessageId;
     }
 
     @DynamoDbPartitionKey

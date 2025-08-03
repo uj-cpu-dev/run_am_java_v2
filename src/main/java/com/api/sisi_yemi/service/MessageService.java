@@ -25,35 +25,115 @@ import static org.springframework.http.HttpStatus.*;
 public class MessageService {
 
     private final DynamoDbUtilHelper dynamoDbUtilHelper;
-
     private final SimpMessagingTemplate messagingTemplate;
 
-
     public MessageDto sendMessageHttp(String conversationId, String senderId, String content) {
-        // Validate input
         validateMessageInput(conversationId, senderId, content);
 
-        // Get required tables
-        DynamoDbHelper<Message> msgTable = dynamoDbUtilHelper.getMessageTable();
-        DynamoDbHelper<Conversation> convTable = dynamoDbUtilHelper.getConversationTable();
-        DynamoDbHelper<User> userTable = dynamoDbUtilHelper.getUserTable();
+        var msgTable = dynamoDbUtilHelper.getMessageTable();
+        var convTable = dynamoDbUtilHelper.getConversationTable();
+        var userTable = dynamoDbUtilHelper.getUserTable();
 
-        // Retrieve conversation and validate access
         Conversation conversation = getConversationWithValidation(convTable, conversationId, senderId);
         User sender = getUserWithValidation(userTable, senderId);
 
-        // Create and save message
         Message message = createMessage(conversationId, senderId, content);
         msgTable.save(message);
 
-        // Update conversation
-        updateConversationAfterMessage(convTable, conversation, content, senderId);
+        updateConversationAfterMessage(convTable, conversation, content, senderId, message.getMessageId());
 
-        // Notify via WebSocket
-        notifyViaWebSocket(conversationId, message, sender);
+        notifyViaWebSocket(conversationId, convertToDto(message, sender), "new");
 
         return convertToDto(message, sender);
     }
+
+    public List<MessageDto> getMessages(String conversationId, String userId) {
+        var msgTable = dynamoDbUtilHelper.getMessageTable();
+        var convTable = dynamoDbUtilHelper.getConversationTable();
+        var userTable = dynamoDbUtilHelper.getUserTable();
+
+        Conversation conversation = getConversationWithValidation(convTable, conversationId, userId);
+
+        return msgTable.getByPartitionKey(conversationId).stream()
+                .filter(msg -> !msg.isDeleted())
+                .sorted(Comparator.comparing(Message::getTimestamp))
+                .map(msg -> convertToDto(msg, userTable.getById(msg.getSenderId()).orElse(null)))
+                .collect(Collectors.toList());
+    }
+
+    public void markMessagesAsRead(String conversationId, String userId) {
+        var msgTable = dynamoDbUtilHelper.getMessageTable();
+        var convTable = dynamoDbUtilHelper.getConversationTable();
+
+        Conversation conversation = getConversationWithValidation(convTable, conversationId, userId);
+
+        List<Message> unreadMessages = msgTable.getByPartitionKey(conversationId).stream()
+                .filter(msg -> !msg.isDeleted())
+                .filter(msg -> !msg.getSenderId().equals(userId) && !msg.isReadBy(userId))
+                .toList();
+
+        unreadMessages.forEach(msg -> {
+            msg.markReadBy(userId);
+            msgTable.save(msg);
+        });
+
+        updateUnreadCount(conversation, userId);
+    }
+
+    public MessageDto editMessage(String conversationId, String messageId, String content, String userId) {
+        if (content == null || content.trim().isEmpty()) {
+            throw new ApiException("Message content cannot be empty", BAD_REQUEST, "EMPTY_MESSAGE");
+        }
+
+        var msgTable = dynamoDbUtilHelper.getMessageTable();
+        var userTable = dynamoDbUtilHelper.getUserTable();
+
+        Message message = msgTable.getByPartitionKey(conversationId).stream()
+                .filter(m -> m.getMessageId().equals(messageId))
+                .findFirst()
+                .orElseThrow(() -> new ApiException("Message not found", NOT_FOUND, "MESSAGE_NOT_FOUND"));
+
+        if (!message.getSenderId().equals(userId)) {
+            throw new ApiException("You can only edit your own messages", FORBIDDEN, "EDIT_NOT_ALLOWED");
+        }
+
+        message.setContent(content);
+        message.setTimestamp(LocalDateTime.now());
+        msgTable.save(message);
+
+        User sender = getUserWithValidation(userTable, userId);
+
+        notifyViaWebSocket(conversationId, convertToDto(message, sender), "edit");
+
+        return convertToDto(message, sender);
+    }
+
+    public void deleteMessage(String conversationId, String messageId, String userId) {
+        var msgTable = dynamoDbUtilHelper.getMessageTable();
+        var convTable = dynamoDbUtilHelper.getConversationTable();
+
+        Message message = msgTable.getByPartitionKey(conversationId).stream()
+                .filter(m -> m.getMessageId().equals(messageId))
+                .findFirst()
+                .orElseThrow(() -> new ApiException("Message not found", NOT_FOUND, "MESSAGE_NOT_FOUND"));
+
+        if (!message.getSenderId().equals(userId)) {
+            throw new ApiException("You can only delete your own messages", FORBIDDEN, "DELETE_NOT_ALLOWED");
+        }
+
+        Conversation conversation = getConversationWithValidation(convTable, conversationId, userId);
+
+        message.softDelete();
+        msgTable.save(message);
+
+        if (messageId.equals(conversation.getLastMessageId())) {
+            updateConversationLastMessage(conversation, msgTable);
+        }
+
+        notifyMessageDeletion(conversationId, messageId);
+    }
+
+    // ========== Private Helpers ==========
 
     private void validateMessageInput(String conversationId, String senderId, String content) {
         if (content == null || content.trim().isEmpty()) {
@@ -92,19 +172,20 @@ public class MessageService {
                 .content(content)
                 .timestamp(LocalDateTime.now())
                 .status("delivered")
-                .readBy(null)
                 .build();
     }
 
     private void updateConversationAfterMessage(DynamoDbHelper<Conversation> convTable,
                                                 Conversation conversation,
                                                 String content,
-                                                String senderId) {
+                                                String senderId,
+                                                String messageId) {
         String receiverId = senderId.equals(conversation.getParticipantId())
                 ? conversation.getSellerId()
                 : conversation.getParticipantId();
 
         conversation.setLastMessage(content);
+        conversation.setLastMessageId(messageId);
         conversation.setTimestamp(LocalDateTime.now());
 
         if (!senderId.equals(receiverId)) {
@@ -118,73 +199,34 @@ public class MessageService {
         convTable.save(conversation);
     }
 
-    private void notifyViaWebSocket(String conversationId, Message message, User sender) {
-        try {
-            messagingTemplate.convertAndSend(
-                    "/topic/messages/" + conversationId,
-                    convertToDto(message, sender)
-            );
-        } catch (Exception e) {
-            log.error("Failed to send WebSocket notification for message {}", message.getMessageId(), e);
-        }
-    }
-
-    public List<MessageDto> getMessages(String conversationId, String userId) {
-        DynamoDbHelper<Message> msgTable = dynamoDbUtilHelper.getMessageTable();
-        DynamoDbHelper<Conversation> convTable = dynamoDbUtilHelper.getConversationTable();
-        DynamoDbHelper<User> userTable = dynamoDbUtilHelper.getUserTable();
-
-        Conversation conversation = convTable.getById(conversationId)
-                .orElseThrow(() -> new ApiException("Conversation not found", NOT_FOUND, "CONVERSATION_NOT_FOUND"));
-
-        if (!List.of(conversation.getParticipantId(), conversation.getSellerId()).contains(userId)) {
-            throw new ApiException("Access denied", FORBIDDEN, "ACCESS_DENIED");
-        }
-
-        return msgTable.findAll().stream()
-                .filter(msg -> msg.getConversationId().equals(conversationId))
-                .sorted(Comparator.comparing(Message::getTimestamp))
-                .map(msg -> {
-                    User sender = userTable.getById(msg.getSenderId()).orElse(null);
-                    return convertToDto(msg, sender);
-                })
-                .collect(Collectors.toList());
-    }
-
-    public void markMessagesAsRead(String conversationId, String userId) {
-        DynamoDbHelper<Message> msgTable = dynamoDbUtilHelper.getMessageTable();
-        DynamoDbHelper<Conversation> convTable = dynamoDbUtilHelper.getConversationTable();
-
-        Conversation conversation = convTable.getById(conversationId)
-                .orElseThrow(() -> new ApiException("Conversation not found", NOT_FOUND, "CONVERSATION_NOT_FOUND"));
-
-        if (!List.of(conversation.getParticipantId(), conversation.getSellerId()).contains(userId)) {
-            throw new ApiException("Access denied", FORBIDDEN, "ACCESS_DENIED");
-        }
-
-        List<Message> unreadMessages = msgTable.findAll().stream()
-                .filter(msg -> msg.getConversationId().equals(conversationId))
-                .filter(msg -> !msg.getSenderId().equals(userId) && msg.isReadBy(userId))
+    private void updateConversationLastMessage(Conversation conversation, DynamoDbHelper<Message> msgTable) {
+        List<Message> messages = msgTable.getByPartitionKey(conversation.getId()).stream()
+                .filter(msg -> !msg.isDeleted())
+                .sorted(Comparator.comparing(Message::getTimestamp).reversed())
                 .toList();
 
-        // Mark messages as read by this user
-        for (Message msg : unreadMessages) {
-            msg.markReadBy(userId);
-            msgTable.save(msg);
+        if (!messages.isEmpty()) {
+            Message last = messages.get(0);
+            conversation.setLastMessage(last.getContent());
+            conversation.setLastMessageId(last.getMessageId());
+            conversation.setTimestamp(last.getTimestamp());
+        } else {
+            conversation.setLastMessage(null);
+            conversation.setLastMessageId(null);
+            conversation.setTimestamp(LocalDateTime.now());
         }
 
-        updateUnreadCount(conversation, userId);
+        dynamoDbUtilHelper.getConversationTable().save(conversation);
     }
 
     private void updateUnreadCount(Conversation conversation, String userId) {
-        DynamoDbHelper<Message> msgTable = dynamoDbUtilHelper.getMessageTable();
+        var msgTable = dynamoDbUtilHelper.getMessageTable();
 
-        long unreadCount = msgTable.findAll().stream()
-                .filter(msg -> msg.getConversationId().equals(conversation.getId()))
-                .filter(msg -> !msg.getSenderId().equals(userId) && msg.isReadBy(userId))
+        long unreadCount = msgTable.getByPartitionKey(conversation.getId()).stream()
+                .filter(msg -> !msg.isDeleted())
+                .filter(msg -> !msg.getSenderId().equals(userId) && !msg.isReadBy(userId))
                 .count();
 
-        // Update conversation based on who is viewing
         if (userId.equals(conversation.getParticipantId())) {
             conversation.setParticipantUnread((int) unreadCount);
         } else {
@@ -192,6 +234,30 @@ public class MessageService {
         }
 
         dynamoDbUtilHelper.getConversationTable().save(conversation);
+    }
+
+    private void notifyViaWebSocket(String conversationId, MessageDto message, String action) {
+        try {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("action", action);
+            payload.put("message", message);
+            messagingTemplate.convertAndSend("/topic/messages/" + conversationId, payload);
+        } catch (Exception e) {
+            log.error("Failed to send WebSocket notification for message {}", message.getId(), e);
+        }
+    }
+
+    private void notifyMessageDeletion(String conversationId, String messageId) {
+        try {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("action", "delete");
+            payload.put("messageId", messageId);
+            payload.put("conversationId", conversationId);
+
+            messagingTemplate.convertAndSend("/topic/messages/" + conversationId, payload);
+        } catch (Exception e) {
+            log.error("Failed to send WebSocket notification for deleted message {}", messageId, e);
+        }
     }
 
     private MessageDto convertToDto(Message message, User sender) {
@@ -215,4 +281,3 @@ public class MessageService {
         return dto;
     }
 }
-

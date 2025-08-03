@@ -22,13 +22,10 @@ public class MessageController {
     private static final Logger logger = LoggerFactory.getLogger(MessageController.class);
 
     private final MessageService messageService;
-
     private final AuthenticationHelper authHelper;
 
     @GetMapping("/{conversationId}")
-    public ResponseEntity<?> getConversationMessages(
-            @PathVariable String conversationId) {
-
+    public ResponseEntity<?> getConversationMessages(@PathVariable String conversationId) {
         try {
             String userId = authHelper.getAuthenticatedUserId();
             List<MessageDto> messages = messageService.getMessages(conversationId, userId);
@@ -43,12 +40,10 @@ public class MessageController {
     }
 
     @PostMapping("/{conversationId}")
-    public ResponseEntity<?> sendMessage(
-            @PathVariable String conversationId,
-            @RequestBody SendMessageRequest request) {
-
-        if(request.getContent().isEmpty()){
-            return null;
+    public ResponseEntity<?> sendMessage(@PathVariable String conversationId,
+                                         @RequestBody SendMessageRequest request) {
+        if (request.getContent() == null || request.getContent().trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Message content cannot be empty");
         }
 
         try {
@@ -65,10 +60,46 @@ public class MessageController {
     }
 
     @PostMapping("/{conversationId}/read")
-    public ResponseEntity<Void> markMessagesAsRead(
-            @PathVariable("conversationId") String conversationId) {
+    public ResponseEntity<Void> markMessagesAsRead(@PathVariable String conversationId) {
         String userId = authHelper.getAuthenticatedUserId();
         messageService.markMessagesAsRead(conversationId, userId);
         return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/{conversationId}/{messageId}")
+    public ResponseEntity<?> editMessage(@PathVariable String conversationId,
+                                         @PathVariable String messageId,
+                                         @RequestBody SendMessageRequest request) {
+        if (request.getContent() == null || request.getContent().trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Message content cannot be empty");
+        }
+
+        try {
+            String userId = authHelper.getAuthenticatedUserId();
+            MessageDto updatedMessage = messageService.editMessage(conversationId, messageId, request.getContent(), userId);
+            return ResponseEntity.ok(updatedMessage);
+        } catch (ApiException e) {
+            logger.warn("API Exception while editing message: {}", e.getMessage());
+            return ResponseEntity.status(e.getStatus()).body(e.getMessage());
+        } catch (Exception e) {
+            logger.error("Unexpected error editing message", e);
+            return ResponseEntity.internalServerError().body("Error processing request");
+        }
+    }
+
+    @DeleteMapping("/{conversationId}/{messageId}")
+    public ResponseEntity<?> deleteMessage(@PathVariable String conversationId,
+                                           @PathVariable String messageId) {
+        try {
+            String userId = authHelper.getAuthenticatedUserId();
+            messageService.deleteMessage(conversationId, messageId, userId);
+            return ResponseEntity.noContent().build();
+        } catch (ApiException e) {
+            logger.warn("API Exception while deleting message: {}", e.getMessage());
+            return ResponseEntity.status(e.getStatus()).body(e.getMessage());
+        } catch (Exception e) {
+            logger.error("Unexpected error deleting message", e);
+            return ResponseEntity.internalServerError().body("Error processing request");
+        }
     }
 }

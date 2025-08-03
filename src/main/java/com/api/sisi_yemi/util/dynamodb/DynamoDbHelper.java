@@ -7,6 +7,7 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 public class DynamoDbHelper<T> {
 
@@ -65,6 +66,15 @@ public class DynamoDbHelper<T> {
                 .stream()
                 .flatMap(page -> page.items().stream())
                 .toList();
+    }
+
+    public List<T> getByPartitionKey(String partitionKey) {
+        return table.query(r -> r.queryConditional(
+                        QueryConditional.keyEqualTo(Key.builder().partitionValue(partitionKey).build()))
+                )
+                .items()
+                .stream()
+                .collect(Collectors.toList());
     }
 }
 
