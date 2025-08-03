@@ -47,6 +47,10 @@ public class MessageController {
             @PathVariable String conversationId,
             @RequestBody SendMessageRequest request) {
 
+        if(request.getContent().isEmpty()){
+            return null;
+        }
+
         try {
             String userId = authHelper.getAuthenticatedUserId();
             MessageDto message = messageService.sendMessageHttp(conversationId, userId, request.getContent());
