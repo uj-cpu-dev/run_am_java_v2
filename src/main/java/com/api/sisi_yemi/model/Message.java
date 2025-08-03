@@ -40,23 +40,27 @@ public class Message {
 
     @DynamoDbAttribute("readBy")
     public Set<String> getReadBy() {
-        return readBy == null ? Collections.emptySet() : readBy;
+        if (readBy == null || readBy.isEmpty()) {
+            return null; // Return null instead of empty set
+        }
+        return readBy;
     }
 
     public void setReadBy(Set<String> readBy) {
-        this.readBy = readBy == null ? Collections.emptySet() : readBy;
+        this.readBy = (readBy == null || readBy.isEmpty()) ? null : readBy;
     }
 
     // Helper method to check if read by user
     public boolean isReadBy(String userId) {
-        return !getReadBy().contains(userId);
+        return readBy != null && readBy.contains(userId);
     }
 
     // Helper method to mark as read
     public void markReadBy(String userId) {
-        Set<String> updatedReadBy = new HashSet<>(getReadBy());
-        updatedReadBy.add(userId);
-        setReadBy(updatedReadBy);
+        if (readBy == null) {
+            readBy = new HashSet<>();
+        }
+        readBy.add(userId);
     }
 }
 
