@@ -4,38 +4,29 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbAttribute;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSortKey;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
-@DynamoDbBean
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@DynamoDbBean
 public class Message {
-
     private String conversationId;
     private String messageId;
     private String senderId;
     private String content;
     private String status;
     private LocalDateTime timestamp;
-
-    private Set<String> readBy = new HashSet<>();
-
-    // Add helper methods
-    public boolean isReadBy(String userId) {
-        return readBy.contains(userId);
-    }
-
-    public void markReadBy(String userId) {
-        readBy.add(userId);
-    }
+    private Set<String> readBy;
 
     @DynamoDbPartitionKey
     public String getConversationId() {
@@ -45,6 +36,27 @@ public class Message {
     @DynamoDbSortKey
     public LocalDateTime getTimestamp() {
         return timestamp;
+    }
+
+    @DynamoDbAttribute("readBy")
+    public Set<String> getReadBy() {
+        return readBy == null ? Collections.emptySet() : readBy;
+    }
+
+    public void setReadBy(Set<String> readBy) {
+        this.readBy = readBy == null ? Collections.emptySet() : readBy;
+    }
+
+    // Helper method to check if read by user
+    public boolean isReadBy(String userId) {
+        return !getReadBy().contains(userId);
+    }
+
+    // Helper method to mark as read
+    public void markReadBy(String userId) {
+        Set<String> updatedReadBy = new HashSet<>(getReadBy());
+        updatedReadBy.add(userId);
+        setReadBy(updatedReadBy);
     }
 }
 
