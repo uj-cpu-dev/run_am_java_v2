@@ -28,8 +28,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws-messages")
-                .setAllowedOriginPatterns("https://runam.africa", "https://www.runam.africa")
+                .setAllowedOriginPatterns("*") // Allow all origins (dev only)
                 .withSockJS()
+                .setSessionCookieNeeded(false)
                 .setSuppressCors(true);
     }
 
