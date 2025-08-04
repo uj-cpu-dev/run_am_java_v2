@@ -30,7 +30,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         registry.addEndpoint("/ws-messages")
                 .setAllowedOriginPatterns("https://runam.africa", "https://www.runam.africa")
                 .withSockJS()
-                .setSessionCookieNeeded(false);
+                .setSuppressCors(true);
     }
 
     @Override

@@ -28,11 +28,11 @@ public class AuthChannelInterceptor implements ChannelInterceptor {
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
 
-        if (accessor != null && StompCommand.CONNECT.equals(accessor.getCommand())) {
+        if (StompCommand.CONNECT.equals(accessor.getCommand())) {
             logger.debug("🔌 STOMP CONNECT command received");
 
             List<String> authHeaders = accessor.getNativeHeader("Authorization");
-            if (authHeaders == null || authHeaders.isEmpty()) {
+            if (authHeaders.isEmpty()) {
                 logger.warn("❌ No Authorization header found in STOMP CONNECT");
                 throw new JwtException("No JWT token found");
             }
