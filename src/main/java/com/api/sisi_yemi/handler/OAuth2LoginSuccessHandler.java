@@ -1,4 +1,4 @@
-package com.api.sisi_yemi.handler;
+/*package com.api.sisi_yemi.handler;
 
 import com.api.sisi_yemi.model.User;
 import com.api.sisi_yemi.util.dynamodb.DynamoDbHelper;
@@ -99,4 +99,4 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
         if (referer != null && referer.contains("facebook")) return "facebook";
         return "unknown";
     }
-}
+}*/
