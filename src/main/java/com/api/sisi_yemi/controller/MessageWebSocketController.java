@@ -49,7 +49,7 @@ public class MessageWebSocketController {
             EditMessageRequest request) {
 
         try {
-            String userId = authHelper.getAuthenticatedUserId();;
+            String userId = authHelper.getAuthenticatedUserId();
             messageService.editMessage(
                     conversationId,
                     request.getMessageId(),
