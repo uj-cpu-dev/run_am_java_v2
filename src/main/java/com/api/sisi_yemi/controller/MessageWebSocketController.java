@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.messaging.MessagingException;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
+import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.messaging.simp.annotation.SubscribeMapping;
 import org.springframework.stereotype.Controller;
 
@@ -116,6 +117,12 @@ public class MessageWebSocketController {
             logger.error("Unexpected error loading initial messages via WebSocket", e);
             throw new MessagingException("Error loading messages");
         }
+    }
+
+    @MessageMapping("/chat.send")
+    @SendTo("/topic/messages")
+    public String send(String message) {
+        return "📨 Server received: " + message;
     }
 }
 

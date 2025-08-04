@@ -33,8 +33,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 .setSuppressCors(true);
     }
 
-    @Override
+    /*@Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
         registration.interceptors(new AuthChannelInterceptor(jwtTokenProvider));
-    }
+    }*/
 }

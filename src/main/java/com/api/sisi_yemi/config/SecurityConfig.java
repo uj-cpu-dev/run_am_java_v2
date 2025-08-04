@@ -1,4 +1,4 @@
-package com.api.sisi_yemi.config;
+/*package com.api.sisi_yemi.config;
 
 import com.api.sisi_yemi.handler.OAuth2LoginSuccessHandler;
 import com.api.sisi_yemi.util.token.JwtTokenFilter;
@@ -69,4 +69,4 @@ public class SecurityConfig {
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
-}
+}*/
