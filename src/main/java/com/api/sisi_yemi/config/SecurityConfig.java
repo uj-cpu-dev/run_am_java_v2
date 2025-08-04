@@ -28,7 +28,7 @@ public class SecurityConfig {
             "/api/public/**",
             "/api/users/**",
             "/api/auth/**",
-            "/ws-messages/**"
+            "/ws-messages"
     };
 
     private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
