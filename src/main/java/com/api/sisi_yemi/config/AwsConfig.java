@@ -42,9 +42,4 @@ public class AwsConfig {
                 .credentialsProvider(DefaultCredentialsProvider.create())
                 .build();
     }
-
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
 }
