@@ -3,11 +3,13 @@ package com.api.sisi_yemi.service;
 import com.api.sisi_yemi.dto.MessageDto;
 import com.api.sisi_yemi.dto.UserDto;
 import com.api.sisi_yemi.exception.ApiException;
+import com.api.sisi_yemi.handler.MessageWebSocketHandler;
 import com.api.sisi_yemi.model.Conversation;
 import com.api.sisi_yemi.model.Message;
 import com.api.sisi_yemi.model.User;
 import com.api.sisi_yemi.util.DynamoDbUtilHelper;
 import com.api.sisi_yemi.util.dynamodb.DynamoDbHelper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -25,7 +27,8 @@ import static org.springframework.http.HttpStatus.*;
 public class MessageService {
 
     private final DynamoDbUtilHelper dynamoDbUtilHelper;
-    //private final SimpMessagingTemplate messagingTemplate;
+    private final MessageWebSocketHandler webSocketHandler;
+    private final ObjectMapper objectMapper;
 
     public MessageDto sendMessageHttp(String conversationId, String senderId, String content) {
         validateMessageInput(conversationId, senderId, content);
@@ -241,7 +244,11 @@ public class MessageService {
             Map<String, Object> payload = new HashMap<>();
             payload.put("action", action);
             payload.put("message", message);
-            //messagingTemplate.convertAndSend("/topic/messages/" + conversationId, payload);
+            webSocketHandler.broadcast(
+                    conversationId,
+                    "message-event",
+                    objectMapper.writeValueAsString(payload)
+            );
         } catch (Exception e) {
             log.error("Failed to send WebSocket notification for message {}", message.getId(), e);
         }
@@ -253,8 +260,11 @@ public class MessageService {
             payload.put("action", "delete");
             payload.put("messageId", messageId);
             payload.put("conversationId", conversationId);
-
-            //messagingTemplate.convertAndSend("/topic/messages/" + conversationId, payload);
+            webSocketHandler.broadcast(
+                    conversationId,
+                    "message-event",
+                    objectMapper.writeValueAsString(payload)
+            );
         } catch (Exception e) {
             log.error("Failed to send WebSocket notification for deleted message {}", messageId, e);
         }

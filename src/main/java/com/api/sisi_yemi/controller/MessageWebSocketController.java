@@ -118,12 +118,6 @@ public class MessageWebSocketController {
             throw new MessagingException("Error loading messages");
         }
     }
-
-    @MessageMapping("/chat.send")
-    @SendTo("/topic/messages")
-    public String send(String message) {
-        return "📨 Server received: " + message;
-    }
 }
 
 @Data
