@@ -123,6 +123,8 @@ public class UserController {
                 .build());
     }
 
+
+
     @PutMapping("/update-user")
     public ResponseEntity<ApiResponse> updateUser(@RequestBody UserUpdateRequest request) {
         String userId = authHelper.getAuthenticatedUserId();

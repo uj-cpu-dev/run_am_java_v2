@@ -1,67 +1,26 @@
 package com.api.sisi_yemi.config;
 
-//import com.api.sisi_yemi.util.token.AuthChannelInterceptor;
-import com.api.sisi_yemi.util.token.JwtTokenProvider;
+
+import com.api.sisi_yemi.handler.MyWebSocketHandler;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.messaging.simp.config.ChannelRegistration;
-import org.springframework.messaging.simp.config.MessageBrokerRegistry;
-import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
-import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
-import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
-
-/*@Configuration
-@EnableWebSocketMessageBroker
-public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
-
-    private final JwtTokenProvider jwtTokenProvider;
-
-    public WebSocketConfig(JwtTokenProvider jwtTokenProvider) {
-        this.jwtTokenProvider = jwtTokenProvider;
-    }
-    @Override
-    public void configureMessageBroker(MessageBrokerRegistry config) {
-        config.enableSimpleBroker("/topic", "/queue", "/user");
-        config.setApplicationDestinationPrefixes("/app");
-        config.setUserDestinationPrefix("/user");
-    }
-
-    @Override
-    public void registerStompEndpoints(StompEndpointRegistry registry) {
-        registry.addEndpoint("/ws-messages")
-                .setAllowedOriginPatterns("*") // Allow all origins (dev only)
-                .withSockJS()
-                .setSessionCookieNeeded(false)
-                .setSuppressCors(true);
-    }
-
-    @Override
-    public void configureClientInboundChannel(ChannelRegistration registration) {
-        registration.interceptors(new AuthChannelInterceptor(jwtTokenProvider));
-    }
-}*/
+import org.springframework.web.socket.config.annotation.EnableWebSocket;
+import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
+import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
 
 @Configuration
-@EnableWebSocketMessageBroker
-public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
+@EnableWebSocket
+public class WebSocketConfig implements WebSocketConfigurer {
 
-    @Override
-    public void configureMessageBroker(MessageBrokerRegistry config) {
-        config.enableSimpleBroker("/topic", "/user");
-        config.setApplicationDestinationPrefixes("/app");
-        config.setUserDestinationPrefix("/user");
+    private final MyWebSocketHandler myWebSocketHandler;
+
+    public WebSocketConfig(MyWebSocketHandler myWebSocketHandler) {
+        this.myWebSocketHandler = myWebSocketHandler;
     }
 
     @Override
-    public void registerStompEndpoints(StompEndpointRegistry registry) {
-        registry.addEndpoint("/ws-messages")
-                .setAllowedOriginPatterns("*") // Allow all origins (dev only)
-                .withSockJS()
-                .setSessionCookieNeeded(false)
-                .setSuppressCors(true);
-    }
-
-    @Override
-    public void configureClientInboundChannel(ChannelRegistration registration) {
-        // No auth interceptor
+    public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
+        registry
+                .addHandler(myWebSocketHandler, "/ws-messages")
+                .setAllowedOrigins("http://localhost:8081", "https://runam.africa");
     }
 }

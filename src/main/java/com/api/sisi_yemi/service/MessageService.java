@@ -25,7 +25,7 @@ import static org.springframework.http.HttpStatus.*;
 public class MessageService {
 
     private final DynamoDbUtilHelper dynamoDbUtilHelper;
-    private final SimpMessagingTemplate messagingTemplate;
+    //private final SimpMessagingTemplate messagingTemplate;
 
     public MessageDto sendMessageHttp(String conversationId, String senderId, String content) {
         validateMessageInput(conversationId, senderId, content);
@@ -241,7 +241,7 @@ public class MessageService {
             Map<String, Object> payload = new HashMap<>();
             payload.put("action", action);
             payload.put("message", message);
-            messagingTemplate.convertAndSend("/topic/messages/" + conversationId, payload);
+            //messagingTemplate.convertAndSend("/topic/messages/" + conversationId, payload);
         } catch (Exception e) {
             log.error("Failed to send WebSocket notification for message {}", message.getId(), e);
         }
@@ -254,7 +254,7 @@ public class MessageService {
             payload.put("messageId", messageId);
             payload.put("conversationId", conversationId);
 
-            messagingTemplate.convertAndSend("/topic/messages/" + conversationId, payload);
+            //messagingTemplate.convertAndSend("/topic/messages/" + conversationId, payload);
         } catch (Exception e) {
             log.error("Failed to send WebSocket notification for deleted message {}", messageId, e);
         }
