@@ -1,4 +1,4 @@
-/*package com.api.sisi_yemi.config;
+package com.api.sisi_yemi.config;
 
 import com.api.sisi_yemi.handler.OAuth2LoginSuccessHandler;
 import com.api.sisi_yemi.util.token.JwtTokenFilter;
@@ -17,7 +17,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfigurationSource;
 
-@Configuration
+/*@Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
@@ -70,3 +70,25 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 }*/
+
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+
+    private static final Logger logger = LoggerFactory.getLogger(SecurityConfig.class);
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+                .csrf(AbstractHttpConfigurer::disable)
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll()) // Allow all
+                .cors(AbstractHttpConfigurer::disable) // Disable CORS
+                .headers(headers -> headers
+                        .frameOptions(HeadersConfigurer.FrameOptionsConfig::disable)
+                        .httpStrictTransportSecurity(HeadersConfigurer.HstsConfig::disable)
+                );
+
+        logger.warn("🚨 All security disabled for testing purposes!");
+        return http.build();
+    }
+}

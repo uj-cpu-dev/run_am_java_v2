@@ -1,6 +1,6 @@
 package com.api.sisi_yemi.config;
 
-import com.api.sisi_yemi.util.token.AuthChannelInterceptor;
+//import com.api.sisi_yemi.util.token.AuthChannelInterceptor;
 import com.api.sisi_yemi.util.token.JwtTokenProvider;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.ChannelRegistration;
