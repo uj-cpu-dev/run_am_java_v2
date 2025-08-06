@@ -2,7 +2,7 @@ package com.api.sisi_yemi.handler;
 
 import com.api.sisi_yemi.dto.MessageDto;
 import com.api.sisi_yemi.service.MessageService;
-import com.api.sisi_yemi.util.auth.AuthenticationHelper;
+import com.api.sisi_yemi.util.token.JwtTokenProvider;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -10,7 +10,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.*;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
+import org.springframework.web.util.UriComponentsBuilder;
 
+import java.net.URI;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -21,7 +23,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class MessageWebSocketHandler extends TextWebSocketHandler {
 
     private final MessageService messageService;
-    private final AuthenticationHelper authHelper;
+    private final JwtTokenProvider jwtTokenProvider;
     private final ObjectMapper objectMapper;
 
     private final Map<String, WebSocketSession> sessions = new ConcurrentHashMap<>();
@@ -29,19 +31,48 @@ public class MessageWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-        String userId = authHelper.getAuthenticatedUserId();
+        URI uri = session.getUri();
+        if (uri == null) {
+            session.close(CloseStatus.BAD_DATA.withReason("URI not provided."));
+            return;
+        }
+
+        String token = UriComponentsBuilder.fromUri(uri).build().getQueryParams().getFirst("token");
+        if (token == null || token.isEmpty()) {
+            session.close(CloseStatus.TLS_HANDSHAKE_FAILURE.withReason("Authentication token not provided."));
+            return;
+        }
+
+        String userId;
+        try {
+            // This is where you would use the token to get the user ID
+            userId = jwtTokenProvider.getUserIdFromToken(token);
+        } catch (Exception e) {
+            session.close(CloseStatus.TLS_HANDSHAKE_FAILURE.withReason("Invalid or expired token."));
+            return;
+        }
+
         sessions.put(session.getId(), session);
         userSessions.computeIfAbsent(userId, id -> new CopyOnWriteArrayList<>()).add(session);
+
+        session.getAttributes().put("userId", userId);
         session.sendMessage(new TextMessage("✅ WebSocket connected as user: " + userId));
     }
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
+        String userId = (String) session.getAttributes().get("userId");
+        if (userId == null) {
+            session.close(CloseStatus.TLS_HANDSHAKE_FAILURE.withReason("User not authenticated."));
+            return;
+        }
+
         try {
             JsonNode json = objectMapper.readTree(message.getPayload());
             String type = json.get("type").asText();
             String conversationId = json.get("conversationId").asText();
-            String userId = authHelper.getAuthenticatedUserId();
+            // Use the userId from the session's attributes
+            // String userId = authHelper.getAuthenticatedUserId();
 
             switch (type) {
                 case "send" -> {
