@@ -7,6 +7,8 @@ import lombok.NoArgsConstructor;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Data
 @Builder
@@ -65,6 +67,13 @@ public class Conversation {
     @DynamoDbSecondarySortKey(indexNames = "participantId-userAdId-index")
     public String getUserAdId() {
         return userAdId;
+    }
+
+    public List<String> getParticipantUserIds() {
+        List<String> userIds = new ArrayList<>();
+        if (participantId != null) userIds.add(participantId);
+        if (sellerId != null) userIds.add(sellerId);
+        return userIds;
     }
 }
 

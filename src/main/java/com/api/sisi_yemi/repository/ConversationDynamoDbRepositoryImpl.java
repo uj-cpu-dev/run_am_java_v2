@@ -96,4 +96,15 @@ public class ConversationDynamoDbRepositoryImpl implements ConversationDynamoDbR
         return conversation;
     }
 
+    @Override
+    public Optional<Conversation> findById(String id) {
+        try {
+            Conversation conversation = table().getItem(Key.builder().partitionValue(id).build());
+            return Optional.ofNullable(conversation);
+        } catch (Exception e) {
+            log.warn("Failed to fetch conversation with ID {}: {}", id, e.getMessage());
+            return Optional.empty();
+        }
+    }
+
 }

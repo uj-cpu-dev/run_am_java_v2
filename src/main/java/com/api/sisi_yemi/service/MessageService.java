@@ -3,16 +3,14 @@ package com.api.sisi_yemi.service;
 import com.api.sisi_yemi.dto.MessageDto;
 import com.api.sisi_yemi.dto.UserDto;
 import com.api.sisi_yemi.exception.ApiException;
-import com.api.sisi_yemi.handler.MessageWebSocketHandler;
 import com.api.sisi_yemi.model.Conversation;
 import com.api.sisi_yemi.model.Message;
 import com.api.sisi_yemi.model.User;
+import com.api.sisi_yemi.repository.ConversationDynamoDbRepositoryImpl;
 import com.api.sisi_yemi.util.DynamoDbUtilHelper;
 import com.api.sisi_yemi.util.dynamodb.DynamoDbHelper;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -27,8 +25,7 @@ import static org.springframework.http.HttpStatus.*;
 public class MessageService {
 
     private final DynamoDbUtilHelper dynamoDbUtilHelper;
-    private final MessageWebSocketHandler webSocketHandler;
-    private final ObjectMapper objectMapper;
+    private final ConversationDynamoDbRepositoryImpl conversationRepository;
 
     public MessageDto sendMessageHttp(String conversationId, String senderId, String content) {
         validateMessageInput(conversationId, senderId, content);
@@ -44,8 +41,6 @@ public class MessageService {
         msgTable.save(message);
 
         updateConversationAfterMessage(convTable, conversation, content, senderId, message.getMessageId());
-
-        notifyViaWebSocket(conversationId, convertToDto(message, sender), "new");
 
         return convertToDto(message, sender);
     }
@@ -106,8 +101,6 @@ public class MessageService {
 
         User sender = getUserWithValidation(userTable, userId);
 
-        notifyViaWebSocket(conversationId, convertToDto(message, sender), "edit");
-
         return convertToDto(message, sender);
     }
 
@@ -132,8 +125,6 @@ public class MessageService {
         if (messageId.equals(conversation.getLastMessageId())) {
             updateConversationLastMessage(conversation, msgTable);
         }
-
-        notifyMessageDeletion(conversationId, messageId);
     }
 
     // ========== Private Helpers ==========
@@ -239,35 +230,11 @@ public class MessageService {
         dynamoDbUtilHelper.getConversationTable().save(conversation);
     }
 
-    private void notifyViaWebSocket(String conversationId, MessageDto message, String action) {
-        try {
-            Map<String, Object> payload = new HashMap<>();
-            payload.put("action", action);
-            payload.put("message", message);
-            webSocketHandler.broadcast(
-                    conversationId,
-                    "message-event",
-                    objectMapper.writeValueAsString(payload)
-            );
-        } catch (Exception e) {
-            log.error("Failed to send WebSocket notification for message {}", message.getId(), e);
-        }
-    }
+    public List<String> getParticipantUserIds(String conversationId) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ApiException("Conversation not found", NOT_FOUND, "CONVERSATION_NOT_FOUND"));
 
-    private void notifyMessageDeletion(String conversationId, String messageId) {
-        try {
-            Map<String, Object> payload = new HashMap<>();
-            payload.put("action", "delete");
-            payload.put("messageId", messageId);
-            payload.put("conversationId", conversationId);
-            webSocketHandler.broadcast(
-                    conversationId,
-                    "message-event",
-                    objectMapper.writeValueAsString(payload)
-            );
-        } catch (Exception e) {
-            log.error("Failed to send WebSocket notification for deleted message {}", messageId, e);
-        }
+        return conversation.getParticipantUserIds();
     }
 
     private MessageDto convertToDto(Message message, User sender) {

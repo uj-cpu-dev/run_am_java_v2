@@ -11,4 +11,6 @@ public interface ConversationDynamoDbRepository {
     List<Conversation> findByUser(String userId);
     Optional<Conversation> findByParticipantAndUserAd(String participantId, String userAdId);
     Conversation save(Conversation conversation);
+
+    Optional<Conversation> findById(String id);
 }

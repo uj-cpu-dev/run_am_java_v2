@@ -6,31 +6,33 @@ import com.api.sisi_yemi.util.auth.AuthenticationHelper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.web.socket.CloseStatus;
-import org.springframework.web.socket.TextMessage;
-import org.springframework.web.socket.WebSocketSession;
+import org.springframework.web.socket.*;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
-import java.io.IOException;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class MessageWebSocketHandler extends TextWebSocketHandler {
 
     private final MessageService messageService;
     private final AuthenticationHelper authHelper;
     private final ObjectMapper objectMapper;
-    private final MessageWebSocketHandler webSocketHandler;
 
     private final Map<String, WebSocketSession> sessions = new ConcurrentHashMap<>();
+    private final Map<String, List<WebSocketSession>> userSessions = new ConcurrentHashMap<>();
+
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+        String userId = authHelper.getAuthenticatedUserId();
         sessions.put(session.getId(), session);
-        session.sendMessage(new TextMessage("✅ WebSocket connected"));
+        userSessions.computeIfAbsent(userId, id -> new CopyOnWriteArrayList<>()).add(session);
+        session.sendMessage(new TextMessage("✅ WebSocket connected as user: " + userId));
     }
 
     @Override
@@ -44,34 +46,27 @@ public class MessageWebSocketHandler extends TextWebSocketHandler {
             switch (type) {
                 case "send" -> {
                     String content = json.get("content").asText();
-                    messageService.sendMessageHttp(conversationId, userId, content);
-                    broadcast(conversationId, "newMessage", content);
+                    MessageDto sentMessage = messageService.sendMessageHttp(conversationId, userId, content);
+                    broadcastMessage(conversationId, "new", sentMessage);
                 }
-
                 case "edit" -> {
                     String messageId = json.get("messageId").asText();
                     String content = json.get("content").asText();
-                    messageService.editMessage(conversationId, messageId, content, userId);
-                    broadcast(conversationId, "messageEdited", messageId);
+                    MessageDto editedMessage = messageService.editMessage(conversationId, messageId, content, userId);
+                    broadcastMessage(conversationId, "edit", editedMessage);
                 }
-
                 case "delete" -> {
                     String messageId = json.get("messageId").asText();
                     messageService.deleteMessage(conversationId, messageId, userId);
-                    broadcast(conversationId, "messageDeleted", messageId);
+                    broadcastDelete(conversationId, messageId);
                 }
-
                 case "mark-read" -> {
                     messageService.markMessagesAsRead(conversationId, userId);
-                    // No need to broadcast
                 }
-
                 case "initial-load" -> {
                     List<MessageDto> messages = messageService.getMessages(conversationId, userId);
-                    String payload = objectMapper.writeValueAsString(messages);
-                    session.sendMessage(new TextMessage(payload));
+                    session.sendMessage(new TextMessage(objectMapper.writeValueAsString(messages)));
                 }
-
                 default -> session.sendMessage(new TextMessage("❌ Unknown message type: " + type));
             }
         } catch (Exception e) {
@@ -79,27 +74,59 @@ public class MessageWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    public void broadcast(String conversationId, String eventType, String payload) {
-        sessions.values().forEach(session -> {
-            if (session.isOpen()) {
-                try {
-                    Map<String, String> message = Map.of(
-                            "type", eventType,
-                            "conversationId", conversationId,
-                            "data", payload
-                    );
-                    String json = objectMapper.writeValueAsString(message);
-                    session.sendMessage(new TextMessage(json));
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        });
-    }
-
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         sessions.remove(session.getId());
+
+        userSessions.forEach((userId, sessionList) ->
+                sessionList.removeIf(s -> s.getId().equals(session.getId()))
+        );
     }
 
+    public void sendMessageToUser(String userId, Object payload) {
+        List<WebSocketSession> userSessionList = userSessions.get(userId);
+        if (userSessionList == null) return;
+
+        try {
+            String json = objectMapper.writeValueAsString(payload);
+            for (WebSocketSession session : userSessionList) {
+                if (session.isOpen()) {
+                    session.sendMessage(new TextMessage(json));
+                }
+            }
+        } catch (Exception e) {
+            log.error("WebSocket send error", e);
+        }
+    }
+
+    private void broadcastMessage(String conversationId, String action, MessageDto message) {
+        try {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("action", action);
+            payload.put("message", message);
+
+            List<String> userIds = messageService.getParticipantUserIds(conversationId);
+            for (String userId : userIds) {
+                sendMessageToUser(userId, payload);
+            }
+        } catch (Exception e) {
+            log.error("Failed to broadcast {} message: {}", action, message.getId(), e);
+        }
+    }
+
+    private void broadcastDelete(String conversationId, String messageId) {
+        try {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("action", "delete");
+            payload.put("messageId", messageId);
+            payload.put("conversationId", conversationId);
+
+            List<String> userIds = messageService.getParticipantUserIds(conversationId);
+            for (String userId : userIds) {
+                sendMessageToUser(userId, payload);
+            }
+        } catch (Exception e) {
+            log.error("Failed to broadcast message deletion: {}", messageId, e);
+        }
+    }
 }
