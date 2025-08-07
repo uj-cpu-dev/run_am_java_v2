@@ -98,6 +98,11 @@ public class MessageWebSocketHandler extends TextWebSocketHandler {
                     List<MessageDto> messages = messageService.getMessages(conversationId, userId);
                     session.sendMessage(new TextMessage(objectMapper.writeValueAsString(messages)));
                 }
+                case "PING" -> {
+                    Map<String, String> pongPayload = new HashMap<>();
+                    pongPayload.put("action", "PONG");
+                    session.sendMessage(new TextMessage(objectMapper.writeValueAsString(pongPayload)));
+                }
                 default -> session.sendMessage(new TextMessage("❌ Unknown message type: " + action));
             }
         } catch (Exception e) {
