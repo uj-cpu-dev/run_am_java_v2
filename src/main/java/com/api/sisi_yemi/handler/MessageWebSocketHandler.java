@@ -70,6 +70,14 @@ public class MessageWebSocketHandler extends TextWebSocketHandler {
         try {
             JsonNode json = objectMapper.readTree(message.getPayload());
             String action = json.get("action").asText();
+
+            if ("PING".equals(action)) {
+                Map<String, String> pongPayload = new HashMap<>();
+                pongPayload.put("action", "PONG");
+                session.sendMessage(new TextMessage(objectMapper.writeValueAsString(pongPayload)));
+                return;
+            }
+
             String conversationId = json.get("conversationId").asText();
             // Use the userId from the session's attributes
             // String userId = authHelper.getAuthenticatedUserId();
@@ -97,11 +105,6 @@ public class MessageWebSocketHandler extends TextWebSocketHandler {
                 case "initial-load" -> {
                     List<MessageDto> messages = messageService.getMessages(conversationId, userId);
                     session.sendMessage(new TextMessage(objectMapper.writeValueAsString(messages)));
-                }
-                case "PING" -> {
-                    Map<String, String> pongPayload = new HashMap<>();
-                    pongPayload.put("action", "PONG");
-                    session.sendMessage(new TextMessage(objectMapper.writeValueAsString(pongPayload)));
                 }
                 default -> session.sendMessage(new TextMessage("❌ Unknown message type: " + action));
             }
