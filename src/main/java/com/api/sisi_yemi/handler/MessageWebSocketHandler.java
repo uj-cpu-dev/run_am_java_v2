@@ -69,12 +69,12 @@ public class MessageWebSocketHandler extends TextWebSocketHandler {
 
         try {
             JsonNode json = objectMapper.readTree(message.getPayload());
-            String type = json.get("type").asText();
+            String action = json.get("action").asText();
             String conversationId = json.get("conversationId").asText();
             // Use the userId from the session's attributes
             // String userId = authHelper.getAuthenticatedUserId();
 
-            switch (type) {
+            switch (action) {
                 case "send" -> {
                     String content = json.get("content").asText();
                     MessageDto sentMessage = messageService.sendMessageHttp(conversationId, userId, content);
@@ -98,7 +98,7 @@ public class MessageWebSocketHandler extends TextWebSocketHandler {
                     List<MessageDto> messages = messageService.getMessages(conversationId, userId);
                     session.sendMessage(new TextMessage(objectMapper.writeValueAsString(messages)));
                 }
-                default -> session.sendMessage(new TextMessage("❌ Unknown message type: " + type));
+                default -> session.sendMessage(new TextMessage("❌ Unknown message type: " + action));
             }
         } catch (Exception e) {
             session.sendMessage(new TextMessage("❌ Error: " + e.getMessage()));
