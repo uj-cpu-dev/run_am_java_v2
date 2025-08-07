@@ -85,6 +85,7 @@ public class MessageService {
 
         var msgTable = dynamoDbUtilHelper.getMessageTable();
         var userTable = dynamoDbUtilHelper.getUserTable();
+        var convTable = dynamoDbUtilHelper.getConversationTable();
 
         Message message = msgTable.getByPartitionKey(conversationId).stream()
                 .filter(m -> m.getMessageId().equals(messageId))
@@ -95,12 +96,24 @@ public class MessageService {
             throw new ApiException("You can only edit your own messages", FORBIDDEN, "EDIT_NOT_ALLOWED");
         }
 
-        message.setContent(content);
-        message.setTimestamp(LocalDateTime.now());
-        msgTable.save(message);
+        // Only update if content changed
+        if (!message.getContent().equals(content)) {
+            message.setContent(content);
+            message.setEdited(true);
+            message.setEditedAt(LocalDateTime.now()); // mark as edited
+            msgTable.save(message);
+
+            Conversation conversation = getConversationWithValidation(convTable, conversationId, userId);
+
+            // If this was the last message in the conversation, update it
+            if (messageId.equals(conversation.getLastMessageId())) {
+                conversation.setLastMessage(content);
+                conversation.setTimestamp(LocalDateTime.now());
+                convTable.save(conversation);
+            }
+        }
 
         User sender = getUserWithValidation(userTable, userId);
-
         return convertToDto(message, sender);
     }
 
@@ -122,6 +135,7 @@ public class MessageService {
         message.softDelete();
         msgTable.save(message);
 
+        // If deleted message was last message, update conversation
         if (messageId.equals(conversation.getLastMessageId())) {
             updateConversationLastMessage(conversation, msgTable);
         }
@@ -245,6 +259,8 @@ public class MessageService {
         dto.setStatus(message.getStatus());
         dto.setTimestamp(message.getTimestamp());
         dto.setSender(convertUserDto(sender));
+        dto.setEdited(message.isEdited());
+        dto.setEditedAt(message.getEditedAt());
         return dto;
     }
 

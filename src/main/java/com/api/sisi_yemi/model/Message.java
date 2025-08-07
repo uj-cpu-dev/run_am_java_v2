@@ -29,6 +29,8 @@ public class Message {
     private LocalDateTime timestamp;
     private Set<String> readBy;
     private boolean isDeleted;
+    private boolean edited;
+    private LocalDateTime editedAt;
 
     @DynamoDbPartitionKey
     public String getConversationId() {

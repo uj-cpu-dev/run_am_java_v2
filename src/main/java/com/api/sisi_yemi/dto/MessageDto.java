@@ -13,4 +13,6 @@ public class MessageDto {
     private LocalDateTime timestamp;
     private String status;
     private int unread;
+    private boolean edited;
+    private LocalDateTime editedAt;
 }
