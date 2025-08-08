@@ -101,6 +101,7 @@ public class MessageWebSocketHandler extends TextWebSocketHandler {
                 }
                 case "mark-read" -> {
                     messageService.markMessagesAsRead(conversationId, userId);
+                    broadcastUnreadCountUpdate(conversationId);
                 }
                 case "initial-load" -> {
                     List<MessageDto> messages = messageService.getMessages(conversationId, userId);
@@ -140,12 +141,14 @@ public class MessageWebSocketHandler extends TextWebSocketHandler {
 
     private void broadcastMessage(String conversationId, String action, MessageDto message) {
         try {
-            Map<String, Object> payload = new HashMap<>();
-            payload.put("action", action);
-            payload.put("message", message);
-
             List<String> userIds = messageService.getParticipantUserIds(conversationId);
+
             for (String userId : userIds) {
+                Map<String, Object> payload = new HashMap<>();
+                payload.put("action", action);
+                payload.put("message", message);
+                payload.put("unreadCount", messageService.getUnreadCount(conversationId, userId));
+
                 sendMessageToUser(userId, payload);
             }
         } catch (Exception e) {
@@ -155,17 +158,36 @@ public class MessageWebSocketHandler extends TextWebSocketHandler {
 
     private void broadcastDelete(String conversationId, String messageId) {
         try {
-            Map<String, Object> payload = new HashMap<>();
-            payload.put("action", "delete");
-            payload.put("messageId", messageId);
-            payload.put("conversationId", conversationId);
-
             List<String> userIds = messageService.getParticipantUserIds(conversationId);
+
             for (String userId : userIds) {
+                Map<String, Object> payload = new HashMap<>();
+                payload.put("action", "delete");
+                payload.put("messageId", messageId);
+                payload.put("conversationId", conversationId);
+                payload.put("unreadCount", messageService.getUnreadCount(conversationId, userId));
+
                 sendMessageToUser(userId, payload);
             }
         } catch (Exception e) {
             log.error("Failed to broadcast message deletion: {}", messageId, e);
+        }
+    }
+
+    private void broadcastUnreadCountUpdate(String conversationId) {
+        try {
+            List<String> userIds = messageService.getParticipantUserIds(conversationId);
+
+            for (String userId : userIds) {
+                Map<String, Object> payload = new HashMap<>();
+                payload.put("action", "unread-count-update");
+                payload.put("conversationId", conversationId);
+                payload.put("unreadCount", messageService.getUnreadCount(conversationId, userId));
+
+                sendMessageToUser(userId, payload);
+            }
+        } catch (Exception e) {
+            log.error("Failed to broadcast unread count update for conversation {}", conversationId, e);
         }
     }
 }

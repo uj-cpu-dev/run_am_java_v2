@@ -251,6 +251,19 @@ public class MessageService {
         return conversation.getParticipantUserIds();
     }
 
+    public int getUnreadCount(String conversationId, String userId) {
+        var convTable = dynamoDbUtilHelper.getConversationTable();
+        Conversation conversation = convTable.getById(conversationId)
+                .orElseThrow(() -> new ApiException("Conversation not found", NOT_FOUND, "CONVERSATION_NOT_FOUND"));
+
+        if (userId.equals(conversation.getParticipantId())) {
+            return conversation.getParticipantUnread();
+        } else if (userId.equals(conversation.getSellerId())) {
+            return conversation.getSellerUnread();
+        }
+        throw new ApiException("Access denied", FORBIDDEN, "ACCESS_DENIED");
+    }
+
     private MessageDto convertToDto(Message message, User sender) {
         var dto = new MessageDto();
         dto.setId(message.getMessageId());
