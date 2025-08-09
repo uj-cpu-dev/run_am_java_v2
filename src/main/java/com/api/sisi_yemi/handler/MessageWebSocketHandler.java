@@ -145,9 +145,9 @@ public class MessageWebSocketHandler extends TextWebSocketHandler {
 
             for (String userId : userIds) {
                 Map<String, Object> payload = new HashMap<>();
+                message.setUnread(messageService.getUnreadCount(conversationId, userId));
                 payload.put("action", action);
                 payload.put("message", message);
-                payload.put("unreadCount", messageService.getUnreadCount(conversationId, userId));
 
                 sendMessageToUser(userId, payload);
             }
@@ -165,7 +165,7 @@ public class MessageWebSocketHandler extends TextWebSocketHandler {
                 payload.put("action", "delete");
                 payload.put("messageId", messageId);
                 payload.put("conversationId", conversationId);
-                payload.put("unreadCount", messageService.getUnreadCount(conversationId, userId));
+                payload.put("unread", messageService.getUnreadCount(conversationId, userId));
 
                 sendMessageToUser(userId, payload);
             }
@@ -182,7 +182,7 @@ public class MessageWebSocketHandler extends TextWebSocketHandler {
                 Map<String, Object> payload = new HashMap<>();
                 payload.put("action", "unread-count-update");
                 payload.put("conversationId", conversationId);
-                payload.put("unreadCount", messageService.getUnreadCount(conversationId, userId));
+                payload.put("unread", messageService.getUnreadCount(conversationId, userId));
 
                 sendMessageToUser(userId, payload);
             }
