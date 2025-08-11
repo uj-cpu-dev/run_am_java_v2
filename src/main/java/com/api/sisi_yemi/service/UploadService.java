@@ -21,8 +21,8 @@ public class UploadService {
     @Value("${aws.s3.bucket-name}")
     private String bucketName;
 
-    public UploadController.PresignedUrlResponse generatePresignedUrl(String adId, String filename, String contentType, String folder) {
-        String objectKey = generateS3Key(filename, adId, folder);
+    public UploadController.PresignedUrlResponse generatePresignedUrl(String id, String filename, String contentType, String folder) {
+        String objectKey = generateS3Key(filename, id, folder);
         Duration expiration = Duration.ofMinutes(10);
 
         PutObjectRequest putObjectRequest = PutObjectRequest.builder()

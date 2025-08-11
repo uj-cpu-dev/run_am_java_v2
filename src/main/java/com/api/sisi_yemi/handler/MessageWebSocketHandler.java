@@ -85,7 +85,8 @@ public class MessageWebSocketHandler extends TextWebSocketHandler {
             switch (action) {
                 case "send" -> {
                     String content = json.get("content").asText();
-                    MessageDto sentMessage = messageService.sendMessageHttp(conversationId, userId, content);
+                    String attachmentUrl = json.get("attachmentUrl").asText();
+                    MessageDto sentMessage = messageService.sendMessageHttp(conversationId, userId, content, attachmentUrl);
                     broadcastMessage(conversationId, "new", sentMessage);
                 }
                 case "edit" -> {

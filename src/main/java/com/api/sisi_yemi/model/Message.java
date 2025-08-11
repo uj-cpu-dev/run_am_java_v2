@@ -31,6 +31,7 @@ public class Message {
     private boolean isDeleted;
     private boolean edited;
     private LocalDateTime editedAt;
+    private String attachmentUrl;
 
     @DynamoDbPartitionKey
     public String getConversationId() {

@@ -15,4 +15,6 @@ public class MessageDto {
     private int unread;
     private boolean edited;
     private LocalDateTime editedAt;
+    private String attachmentUrl;
+    private String attachmentType;
 }

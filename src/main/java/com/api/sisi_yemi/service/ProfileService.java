@@ -8,7 +8,6 @@ import com.api.sisi_yemi.model.UserAd;
 import com.api.sisi_yemi.repository.UserAdDynamoDbRepository;
 import com.api.sisi_yemi.util.dynamodb.DynamoDbHelper;
 import com.api.sisi_yemi.util.dynamodb.DynamoDbHelperFactory;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -27,7 +26,6 @@ public class ProfileService {
 
     public ProfileService(DynamoDbHelperFactory dynamoDbHelperFactory,
                           UserAdDynamoDbRepository userAdRepository,
-                          UserAdService userAdService,
                           @Value("${users.table}") String USER_TABLE_NAME) {
         this.dynamoDbHelperFactory = dynamoDbHelperFactory;
         this.userAdRepository = userAdRepository;

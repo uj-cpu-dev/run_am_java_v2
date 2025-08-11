@@ -34,7 +34,7 @@ public class MessageWebSocketController {
 
         try {
             String userId = authHelper.getAuthenticatedUserId();
-            messageService.sendMessageHttp(conversationId, userId, request.getContent());
+            messageService.sendMessageHttp(conversationId, userId, request.getContent(), request.getAttachmentUrl());
         } catch (ApiException e) {
             logger.error("Failed to send message via WebSocket: {}", e.getMessage());
             throw new MessagingException(e.getMessage());

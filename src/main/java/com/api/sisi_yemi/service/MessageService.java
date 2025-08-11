@@ -27,7 +27,7 @@ public class MessageService {
     private final DynamoDbUtilHelper dynamoDbUtilHelper;
     private final ConversationDynamoDbRepositoryImpl conversationRepository;
 
-    public MessageDto sendMessageHttp(String conversationId, String senderId, String content) {
+    public MessageDto sendMessageHttp(String conversationId, String senderId, String content, String attachmentUrl) {
         validateMessageInput(conversationId, senderId, content);
 
         var msgTable = dynamoDbUtilHelper.getMessageTable();
@@ -37,7 +37,7 @@ public class MessageService {
         Conversation conversation = getConversationWithValidation(convTable, conversationId, senderId);
         User sender = getUserWithValidation(userTable, senderId);
 
-        Message message = createMessage(conversationId, senderId, content);
+        Message message = createMessage(conversationId, senderId, content, attachmentUrl);
         msgTable.save(message);
 
         updateConversationAfterMessage(convTable, conversation, content, senderId, message.getMessageId());
@@ -172,15 +172,21 @@ public class MessageService {
                 .orElseThrow(() -> new ApiException("User not found", NOT_FOUND, "USER_NOT_FOUND"));
     }
 
-    private Message createMessage(String conversationId, String senderId, String content) {
-        return Message.builder()
+    private Message createMessage(String conversationId, String senderId, String content, String attachmentUrl) {
+        Message.MessageBuilder builder = Message.builder()
                 .conversationId(conversationId)
                 .messageId(UUID.randomUUID().toString())
                 .senderId(senderId)
                 .content(content)
                 .timestamp(LocalDateTime.now())
-                .status("delivered")
-                .build();
+                .status("delivered");
+
+        if (attachmentUrl != null && !attachmentUrl.isEmpty()) {
+            builder.attachmentUrl(attachmentUrl);
+            // You might want to add attachment type detection here
+        }
+
+        return builder.build();
     }
 
     private void updateConversationAfterMessage(DynamoDbHelper<Conversation> convTable,
@@ -274,6 +280,7 @@ public class MessageService {
         dto.setSender(convertUserDto(sender));
         dto.setEdited(message.isEdited());
         dto.setEditedAt(message.getEditedAt());
+        dto.setAttachmentUrl(message.getAttachmentUrl());
         return dto;
     }
 
