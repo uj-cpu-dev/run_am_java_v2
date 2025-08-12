@@ -32,6 +32,7 @@ public class Message {
     private boolean edited;
     private LocalDateTime editedAt;
     private String attachmentUrl;
+    private String attachmentType;
 
     @DynamoDbPartitionKey
     public String getConversationId() {

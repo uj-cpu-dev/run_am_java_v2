@@ -183,7 +183,14 @@ public class MessageService {
 
         if (attachmentUrl != null && !attachmentUrl.isEmpty()) {
             builder.attachmentUrl(attachmentUrl);
-            // You might want to add attachment type detection here
+            // Detect attachment type from URL
+            if (attachmentUrl.matches("(?i).*\\.(jpg|jpeg|png|gif)$")) {
+                builder.attachmentType("image");
+            } else if (attachmentUrl.matches("(?i).*\\.(mp4|mov|avi)$")) {
+                builder.attachmentType("video");
+            } else {
+                builder.attachmentType("file");
+            }
         }
 
         return builder.build();
