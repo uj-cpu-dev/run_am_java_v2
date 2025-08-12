@@ -46,7 +46,7 @@ public class MessageController {
     @PostMapping("/{conversationId}")
     public ResponseEntity<?> sendMessage(@PathVariable String conversationId,
                                          @RequestBody SendMessageRequest request) {
-        if (request.getContent() == null || request.getContent().trim().isEmpty()) {
+        if (request.getContent() == null || request.getContent().trim().isEmpty() && request.getAttachmentUrl().trim().isEmpty()) {
             return ResponseEntity.badRequest().body("Message content cannot be empty");
         }
 
