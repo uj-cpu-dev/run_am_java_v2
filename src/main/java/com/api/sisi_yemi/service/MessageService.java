@@ -28,8 +28,8 @@ public class MessageService {
     private final ConversationDynamoDbRepositoryImpl conversationRepository;
 
     public MessageDto sendMessageHttp(String conversationId, String senderId, String content, String attachmentUrl) {
-        if(content.trim().isEmpty() && attachmentUrl.trim().isEmpty()){
-            validateMessageInput(conversationId, senderId, content);
+        if((content == null || content.trim().isEmpty()) && (attachmentUrl == null || attachmentUrl.trim().isEmpty())){
+            throw new ApiException("Either message content or attachment must be provided", BAD_REQUEST, "EMPTY_MESSAGE");
         }
 
         var msgTable = dynamoDbUtilHelper.getMessageTable();
@@ -42,7 +42,7 @@ public class MessageService {
         Message message = createMessage(conversationId, senderId, content, attachmentUrl);
         msgTable.save(message);
 
-        updateConversationAfterMessage(convTable, conversation, content, senderId, message.getMessageId());
+        updateConversationAfterMessage(convTable, conversation, message, senderId);
 
         return convertToDto(message, sender);
     }
@@ -102,7 +102,7 @@ public class MessageService {
         if (!message.getContent().equals(content)) {
             message.setContent(content);
             message.setEdited(true);
-            message.setEditedAt(LocalDateTime.now()); // mark as edited
+            message.setEditedAt(LocalDateTime.now());
             msgTable.save(message);
 
             Conversation conversation = getConversationWithValidation(convTable, conversationId, userId);
@@ -145,18 +145,6 @@ public class MessageService {
 
     // ========== Private Helpers ==========
 
-    private void validateMessageInput(String conversationId, String senderId, String content) {
-        if (content == null || content.trim().isEmpty()) {
-            throw new ApiException("Message content cannot be empty", BAD_REQUEST, "EMPTY_MESSAGE");
-        }
-        if (conversationId == null || conversationId.trim().isEmpty()) {
-            throw new ApiException("Conversation ID cannot be empty", BAD_REQUEST, "EMPTY_CONVERSATION_ID");
-        }
-        if (senderId == null || senderId.trim().isEmpty()) {
-            throw new ApiException("Sender ID cannot be empty", BAD_REQUEST, "EMPTY_SENDER_ID");
-        }
-    }
-
     private Conversation getConversationWithValidation(DynamoDbHelper<Conversation> convTable,
                                                        String conversationId, String senderId) {
         Conversation conversation = convTable.getById(conversationId)
@@ -179,37 +167,62 @@ public class MessageService {
                 .conversationId(conversationId)
                 .messageId(UUID.randomUUID().toString())
                 .senderId(senderId)
-                .content(content)
                 .timestamp(LocalDateTime.now())
                 .status("delivered");
 
-        if (attachmentUrl != null && !attachmentUrl.isEmpty()) {
+        if (content != null && !content.trim().isEmpty()) {
+            builder.content(content);
+        }
+
+        if (attachmentUrl != null && !attachmentUrl.trim().isEmpty()) {
             builder.attachmentUrl(attachmentUrl);
-            // Detect attachment type from URL
-            if (attachmentUrl.matches("(?i).*\\.(jpg|jpeg|png|gif)$")) {
-                builder.attachmentType("image");
-            } else if (attachmentUrl.matches("(?i).*\\.(mp4|mov|avi)$")) {
-                builder.attachmentType("video");
-            } else {
-                builder.attachmentType("file");
-            }
+            builder.attachmentType(determineAttachmentType(attachmentUrl));
         }
 
         return builder.build();
     }
 
+    private String determineAttachmentType(String url) {
+        if (url == null) return null;
+
+        String extension = url.substring(url.lastIndexOf(".") + 1).toLowerCase();
+        switch (extension) {
+            case "jpg":
+            case "jpeg":
+            case "png":
+            case "gif":
+                return "image";
+            case "mp4":
+            case "mov":
+            case "avi":
+                return "video";
+            case "mp3":
+            case "wav":
+                return "audio";
+            case "pdf":
+                return "pdf";
+            default:
+                return "file";
+        }
+    }
+
     private void updateConversationAfterMessage(DynamoDbHelper<Conversation> convTable,
                                                 Conversation conversation,
-                                                String content,
-                                                String senderId,
-                                                String messageId) {
+                                                Message message,
+                                                String senderId) {
         String receiverId = senderId.equals(conversation.getParticipantId())
                 ? conversation.getSellerId()
                 : conversation.getParticipantId();
 
-        conversation.setLastMessage(content);
-        conversation.setLastMessageId(messageId);
-        conversation.setTimestamp(LocalDateTime.now());
+        // Set last message content - use attachment indicator if no text content
+        String lastMessageContent = message.getContent();
+        if ((lastMessageContent == null || lastMessageContent.isEmpty()) && message.getAttachmentUrl() != null) {
+            lastMessageContent = "[Attachment]";
+        }
+
+        conversation.setLastMessage(lastMessageContent);
+        conversation.setLastMessageId(message.getMessageId());
+        conversation.setTimestamp(message.getTimestamp());
 
         if (!senderId.equals(receiverId)) {
             if (senderId.equals(conversation.getParticipantId())) {
@@ -230,7 +243,12 @@ public class MessageService {
 
         if (!messages.isEmpty()) {
             Message last = messages.get(0);
-            conversation.setLastMessage(last.getContent());
+            String lastMessageContent = last.getContent();
+            if ((lastMessageContent == null || lastMessageContent.isEmpty()) && last.getAttachmentUrl() != null) {
+                lastMessageContent = "[Attachment]";
+            }
+
+            conversation.setLastMessage(lastMessageContent);
             conversation.setLastMessageId(last.getMessageId());
             conversation.setTimestamp(last.getTimestamp());
         } else {
@@ -290,6 +308,7 @@ public class MessageService {
         dto.setEdited(message.isEdited());
         dto.setEditedAt(message.getEditedAt());
         dto.setAttachmentUrl(message.getAttachmentUrl());
+        dto.setAttachmentType(message.getAttachmentType());
         return dto;
     }
 
