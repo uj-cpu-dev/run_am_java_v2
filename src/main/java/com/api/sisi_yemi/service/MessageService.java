@@ -28,7 +28,9 @@ public class MessageService {
     private final ConversationDynamoDbRepositoryImpl conversationRepository;
 
     public MessageDto sendMessageHttp(String conversationId, String senderId, String content, String attachmentUrl) {
-        validateMessageInput(conversationId, senderId, content);
+        if(content.trim().isEmpty() && attachmentUrl.trim().isEmpty()){
+            validateMessageInput(conversationId, senderId, content);
+        }
 
         var msgTable = dynamoDbUtilHelper.getMessageTable();
         var convTable = dynamoDbUtilHelper.getConversationTable();
