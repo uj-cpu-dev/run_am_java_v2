@@ -34,6 +34,7 @@ public class UserAdService {
     private final AdValidator adValidator;
     private final ImageUploader imageUploader;
     private final DynamoDbUtilHelper dynamoDbUtilHelper;
+    private final FilterAdHelper filterAdHelper;
 
     public List<UserAd> getUserAdsByStatus(String userId, UserAd.AdStatus status) {
         return userAdRepository.findByUserIdAndStatus(userId, status);
@@ -158,24 +159,31 @@ public class UserAdService {
     }
 
     private RecentActiveAdResponse mapToRecentActiveAdResponse(UserAd ad) {
-        return RecentActiveAdResponse.builder()
-                .id(ad.getId())
-                .title(ad.getTitle())
-                .price(ad.getPrice())
-                .category(ad.getCategory())
-                .description(ad.getDescription())
-                .location(ad.getLocation())
-                .condition(ad.getCondition())
-                .images(ad.getImages())
-                .views(ad.getViews())
-                .messages(ad.getMessages())
-                .datePosted(ad.getDatePosted())
-                .status(ad.getStatus())
-                .dateSold(ad.getDateSold())
-                .build();
+        try {
+            if (ad == null) return null;
+
+            return RecentActiveAdResponse.builder()
+                    .id(ad.getId() != null ? ad.getId() : "unknown")
+                    .title(ad.getTitle() != null ? ad.getTitle() : "No Title")
+                    .price(ad.getPrice())
+                    .category(ad.getCategory() != null ? ad.getCategory() : "Uncategorized")
+                    .description(ad.getDescription() != null ? ad.getDescription() : "")
+                    .location(ad.getLocation() != null ? ad.getLocation() : "Unknown Location")
+                    .condition(ad.getCondition() != null ? ad.getCondition() : "Unknown")
+                    .images(ad.getImages() != null ? ad.getImages() : Collections.emptyList())
+                    .views(ad.getViews())
+                    .messages(ad.getMessages())
+                    .datePosted(ad.getDatePosted() != null ? ad.getDatePosted() : Instant.now())
+                    .status(UserAd.AdStatus.valueOf(ad.getStatus() != null ? ad.getStatus().name() : "UNKNOWN"))
+                    .dateSold(ad.getDateSold())
+                    .build();
+        } catch (Exception e) {
+            log.error("Error mapping ad to response: {}", ad.getId(), e);
+            return null;
+        }
     }
 
-    public FilteredAdResponse filterAds(
+    /*public FilteredAdResponse filterAds(
             String statusStr,
             String category,
             String location,
@@ -192,28 +200,118 @@ public class UserAdService {
         DynamoDbIndex<UserAd> index = dynamoDbUtilHelper.getUserAdsTable().getRawTable()
                 .index("status-datePosted-index");
 
-        QueryEnhancedRequest queryRequest;
-        try {
-            queryRequest = buildQueryRequest(status, sortDir, paginationToken);
-        } catch (IllegalArgumentException e) {
-            throw new RuntimeException("Failed to build query request: " + e.getMessage(), e);
-        }
+        QueryEnhancedRequest queryRequest = buildQueryRequest(status, sortDir, paginationToken);
 
         SdkIterable<Page<UserAd>> sdkPages = index.query(queryRequest);
         Iterator<Page<UserAd>> iterator = sdkPages.iterator();
 
-        List<UserAd> result = new ArrayList<>();
+        List<UserAd> filteredAds = new ArrayList<>();
         Map<String, AttributeValue> lastEvaluatedKey = null;
 
         if (iterator.hasNext()) {
             Page<UserAd> page = iterator.next();
-            result.addAll(filterPageItems(page.items(), category, location, condition, minPrice, maxPrice, search));
+            filteredAds.addAll(filterPageItems(page.items(), category, location, condition, minPrice, maxPrice, search));
             lastEvaluatedKey = page.lastEvaluatedKey();
         }
 
-        sortResults(result, sortBy, sortDir);
-        Map<String, String> nextToken = buildPaginationToken(lastEvaluatedKey);
+        sortResults(filteredAds, sortBy, sortDir);
 
-        return new FilteredAdResponse(result, nextToken, nextToken != null);
+        List<RecentActiveAdResponse> responseItems = convertToResponse(filteredAds);
+
+        Map<String, String> nextToken = buildPaginationToken(lastEvaluatedKey);
+        boolean hasNextPage = nextToken != null && !nextToken.isEmpty();
+
+        return new FilteredAdResponse(responseItems, nextToken, hasNextPage);
+    }
+
+    private List<RecentActiveAdResponse> convertToResponse(List<UserAd> userAds) {
+        return userAds.stream()
+                .map(this::mapToRecentActiveAdResponse)
+                .collect(Collectors.toList());
+    }*/
+
+    public FilteredAdResponse filterAds(
+            String statusStr,
+            String category,
+            String location,
+            String condition,
+            Double minPrice,
+            Double maxPrice,
+            String search,
+            String sortBy,
+            String sortDir,
+            Map<String, String> paginationToken
+    ) {
+        validateFilterParameters(category, location, condition, minPrice, maxPrice, search);
+        UserAd.AdStatus status = FilterAdHelper.parseStatus(statusStr);
+
+        DynamoDbIndex<UserAd> index = dynamoDbUtilHelper.getUserAdsTable().getRawTable()
+                .index("status-datePosted-index");
+
+        QueryEnhancedRequest queryRequest = buildQueryRequest(status, sortDir, paginationToken);
+
+        SdkIterable<Page<UserAd>> sdkPages = index.query(queryRequest);
+        Iterator<Page<UserAd>> iterator = sdkPages.iterator();
+
+        List<UserAd> filteredAds = new ArrayList<>();
+        Map<String, AttributeValue> lastEvaluatedKey = null;
+
+        if (iterator.hasNext()) {
+            Page<UserAd> page = iterator.next();
+            filteredAds.addAll(filterAdHelper.filterPageItems(page.items(), category, location, condition, minPrice, maxPrice, search));
+            lastEvaluatedKey = page.lastEvaluatedKey();
+        }
+
+        filterAdHelper.sortResults(filteredAds, sortBy, sortDir);
+
+        List<RecentActiveAdResponse> responseItems = convertToResponse(filteredAds);
+
+        Map<String, String> nextToken = buildPaginationToken(lastEvaluatedKey);
+        boolean hasNextPage = nextToken != null && !nextToken.isEmpty();
+
+        return new FilteredAdResponse(responseItems, nextToken, hasNextPage);
+    }
+
+    private List<RecentActiveAdResponse> convertToResponse(List<UserAd> userAds) {
+        return userAds.stream()
+                .map(this::mapToRecentActiveAdResponse)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+    }
+
+    private void validateFilterParameters(String category, String location,
+                                          String condition, Double minPrice,
+                                          Double maxPrice, String search) {
+
+        if (search != null && search.length() > 100) {
+            throw new IllegalArgumentException("Search term too long");
+        }
+
+        if (category != null && category.length() > 50) {
+            throw new IllegalArgumentException("Category filter too long");
+        }
+
+        if (location != null && location.length() > 100) {
+            throw new IllegalArgumentException("Location filter too long");
+        }
+
+        if (condition != null) {
+            List<String> validConditions = Arrays.asList("new", "used", "refurbished");
+            if (!validConditions.contains(condition.toLowerCase())) {
+                throw new IllegalArgumentException("Invalid condition value");
+            }
+        }
+
+        if (minPrice != null && minPrice < 0) {
+            throw new IllegalArgumentException("Minimum price cannot be negative");
+        }
+
+        if (maxPrice != null && maxPrice < 0) {
+            throw new IllegalArgumentException("Maximum price cannot be negative");
+        }
+
+        if (minPrice != null && maxPrice != null && minPrice > maxPrice) {
+            throw new IllegalArgumentException("Minimum price cannot be greater than maximum price");
+        }
     }
 }

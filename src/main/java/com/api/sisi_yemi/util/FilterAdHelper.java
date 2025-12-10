@@ -2,6 +2,7 @@ package com.api.sisi_yemi.util;
 
 import com.api.sisi_yemi.model.UserAd;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
@@ -17,6 +18,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
+@Component
 public class FilterAdHelper {
 
     public static UserAd.AdStatus parseStatus(String statusStr) {
@@ -69,7 +71,7 @@ public class FilterAdHelper {
         return builder.build();
     }
 
-    public static List<UserAd> filterPageItems(
+    /*public static List<UserAd> filterPageItems(
             List<UserAd> items,
             String category,
             String location,
@@ -92,14 +94,134 @@ public class FilterAdHelper {
                                         ad.getTitle().toLowerCase().contains(search.toLowerCase()))
                 )
                 .collect(Collectors.toList());
+    }*/
+
+    public List<UserAd> filterPageItems(List<UserAd> items,
+                                         String category,
+                                         String location,
+                                         String condition,
+                                         Double minPrice,
+                                         Double maxPrice,
+                                         String search) {
+        return items.stream()
+                .filter(ad -> category == null || matchesCategory(ad, category))
+                .filter(ad -> location == null || matchesLocation(ad, location))
+                .filter(ad -> condition == null || matchesCondition(ad, condition))
+                .filter(ad -> minPrice == null || matchesMinPrice(ad, minPrice))
+                .filter(ad -> maxPrice == null || matchesMaxPrice(ad, maxPrice))
+                .filter(ad -> search == null || matchesSearch(ad, search))
+                .collect(Collectors.toList());
+    }
+    private boolean matchesSearch(UserAd ad, String searchTerm) {
+        if (searchTerm == null || searchTerm.trim().isEmpty()) {
+            return true;
+        }
+
+        String normalizedSearch = searchTerm.toLowerCase();
+
+        // Search across multiple fields with different weights/priority
+        return
+                // Exact matches (highest priority)
+                (ad.getTitle() != null && ad.getTitle().toLowerCase().equals(normalizedSearch)) ||
+                        (ad.getCategory() != null && ad.getCategory().toLowerCase().equals(normalizedSearch)) ||
+
+                        // Partial matches in title (high priority)
+                        (ad.getTitle() != null && ad.getTitle().toLowerCase().contains(normalizedSearch)) ||
+
+                        // Partial matches in description (medium priority)
+                        (ad.getDescription() != null && ad.getDescription().toLowerCase().contains(normalizedSearch)) ||
+
+                        // Partial matches in category (medium priority)
+                        (ad.getCategory() != null && ad.getCategory().toLowerCase().contains(normalizedSearch)) ||
+
+                        // Partial matches in location (low priority)
+                        (ad.getLocation() != null && ad.getLocation().toLowerCase().contains(normalizedSearch)) ||
+
+                        // Word-by-word matching for better search results
+                        matchesIndividualWords(ad, normalizedSearch);
     }
 
-    public static void sortResults(List<UserAd> ads, String sortBy, String sortDir) {
+    // Helper method for word-by-word matching
+    private boolean matchesIndividualWords(UserAd ad, String searchTerm) {
+        String[] searchWords = searchTerm.split("\\s+");
+
+        for (String word : searchWords) {
+            if (word.length() < 2) continue; // Skip very short words
+
+            boolean wordFound =
+                    (ad.getTitle() != null && ad.getTitle().toLowerCase().contains(word)) ||
+                            (ad.getDescription() != null && ad.getDescription().toLowerCase().contains(word)) ||
+                            (ad.getCategory() != null && ad.getCategory().toLowerCase().contains(word)) ||
+                            (ad.getLocation() != null && ad.getLocation().toLowerCase().contains(word));
+
+            if (!wordFound) {
+                return false;
+            }
+        }
+
+        return searchWords.length > 0;
+    }
+
+    private boolean matchesCategory(UserAd ad, String category) {
+        return ad.getCategory() != null &&
+                ad.getCategory().toLowerCase().contains(category.toLowerCase());
+    }
+
+    private boolean matchesLocation(UserAd ad, String location) {
+        return ad.getLocation() != null &&
+                ad.getLocation().toLowerCase().contains(location.toLowerCase());
+    }
+
+    private boolean matchesCondition(UserAd ad, String condition) {
+        return ad.getCondition() != null &&
+                ad.getCondition().toLowerCase().equals(condition.toLowerCase());
+    }
+
+    private boolean matchesMinPrice(UserAd ad, Double minPrice) {
+        return ad.getPrice() >= minPrice;
+    }
+
+    private boolean matchesMaxPrice(UserAd ad, Double maxPrice) {
+        return ad.getPrice() <= maxPrice;
+    }
+
+
+    /*public static void sortResults(List<UserAd> ads, String sortBy, String sortDir) {
         Comparator<UserAd> comparator = switch (sortBy) {
             case "price" -> Comparator.comparing(UserAd::getPrice);
             case "datePosted" -> Comparator.comparing(UserAd::getDatePosted);
             default -> Comparator.comparing(UserAd::getDatePosted);
         };
+
+        if ("desc".equalsIgnoreCase(sortDir)) {
+            comparator = comparator.reversed();
+        }
+
+        ads.sort(comparator);
+    }*/
+
+    public void sortResults(List<UserAd> ads, String sortBy, String sortDir) {
+        if (ads == null || ads.isEmpty()) return;
+
+        Comparator<UserAd> comparator;
+
+        switch (sortBy.toLowerCase()) {
+            case "price":
+                comparator = Comparator.comparingDouble(UserAd::getPrice);
+                break;
+            case "title":
+                comparator = Comparator.comparing(ad ->
+                        ad.getTitle() != null ? ad.getTitle().toLowerCase() : "");
+                break;
+            case "location":
+                comparator = Comparator.comparing(ad ->
+                        ad.getLocation() != null ? ad.getLocation().toLowerCase() : "");
+                break;
+            case "dateposted":
+            default:
+                comparator = Comparator.comparing(UserAd::getDatePosted);
+                break;
+        }
 
         if ("desc".equalsIgnoreCase(sortDir)) {
             comparator = comparator.reversed();

@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 public record FilteredAdResponse(
-        List<UserAd> items,
+        List<RecentActiveAdResponse> items,
         Map<String, String> nextToken,
         boolean hasNextPage
 ) {}

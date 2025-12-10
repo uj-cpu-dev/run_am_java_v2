@@ -56,8 +56,9 @@ public class AwsConfigDev {
                 .build();
     }
 
-    @Bean
+    /*@Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
-}*/
+
+ }*/

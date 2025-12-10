@@ -10,20 +10,16 @@ import com.api.sisi_yemi.service.AdDetailsService;
 import com.api.sisi_yemi.service.FavoriteService;
 import com.api.sisi_yemi.service.UserAdService;
 import com.api.sisi_yemi.util.auth.AuthenticationHelper;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.Instant;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/users")
@@ -39,6 +35,8 @@ public class UserAdController {
     private final AdDetailsService adDetailsService;
 
     private final FavoriteService favoriteService;
+
+    private final ObjectMapper objectMapper;
 
     @GetMapping("/user/userAds")
     public ResponseEntity<?> getAllUserAds() {
@@ -205,18 +203,33 @@ public class UserAdController {
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "datePosted") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDir,
-            @RequestParam(required = false) Map<String, String> paginationToken
+            @RequestParam(required = false) String paginationToken
     ) {
+        logger.info("Filter happening");
         // Trim all string inputs
         if (category != null) category = category.trim();
         if (location != null) location = location.trim();
         if (condition != null) condition = condition.trim();
         if (search != null) search = search.trim();
 
+        Map<String, String> paginationTokenMap = null;
+        if (paginationToken != null && !paginationToken.isEmpty()) {
+            paginationTokenMap = parsePaginationToken(paginationToken);
+        }
+
         List<FilteredAdResponse> ads = Collections.singletonList(
                 userAdService.filterAds(status, category, location, condition,
-                        minPrice, maxPrice, search, sortBy, sortDir, paginationToken)
+                        minPrice, maxPrice, search, sortBy, sortDir, paginationTokenMap)
         );
         return ResponseEntity.ok(ads);
+    }
+
+    private Map<String, String> parsePaginationToken(String token) {
+        try {
+            String decoded = new String(Base64.getDecoder().decode(token));
+            return objectMapper.readValue(decoded, new TypeReference<Map<String, String>>() {});
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid pagination token format");
+        }
     }
 }
